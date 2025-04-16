@@ -140,11 +140,6 @@ export async function syncUserData() {
               }
               transformedRecord[watermelonField] = value;
             });
-            // Ensure 'id' field exists for WatermelonDB
-            if (transformedRecord.id2 && !transformedRecord.id) {
-              transformedRecord.id = transformedRecord.id2;
-              delete transformedRecord.id2;
-            }
             console.log(`[syncService] Transformed record for ${watermelonTable}:`, transformedRecord);
             // If the record was created after lastPulledAt, it's a new record
             if (new Date(record.createdat) > new Date(lastPulledAt || 0)) {

@@ -29,14 +29,17 @@ function safeUUID() {
 // ======= SINGLE STORE FUNCTIONS =======
 
 export async function storeNewUser(user: User) {
-  console.log("111111!!!SYNCING NEW USER KJAHIUOFDHIUOHUIOWRHGWV");
-  // await database.write(async () => {
-  //   await database.unsafeResetDatabase(); // TODO: Remove this, just for testing
-  // });
-  console.log('Storing new user in watermelon with id:', user.id);
+  const idToUse = user.id || safeUUID();
+  console.log('[storeNewUser] Incoming user.id:', user.id, 'id2 to use:', idToUse);
+  // Check if user already exists
+  const existing = await database.get<wUser>('users').query(Q.where('id2', idToUse)).fetch();
+  if (existing.length > 0) {
+    console.log('[storeNewUser] User with id2 already exists, skipping creation:', idToUse);
+    return;
+  }
   await database.write(async () => {
     await database.get<wUser>('users').create(raw => {
-      raw.id2 = safeUUID();
+      raw.id2 = idToUse;
       raw.username = user.username;
       raw.email = user.email;
       raw.avatar_url = user.avatarURL;
@@ -54,7 +57,7 @@ export async function storeNewUser(user: User) {
 export async function storeNewFolder(folder: Folder) {
   await database.write(async () => {
     await database.get<wFolder>('folders').create(raw => {
-      raw.id2 = safeUUID();
+      raw.id2 = folder.id || safeUUID();
       raw.owner_id = folder.ownerID;
       raw.parent_folder_id = folder.parentFolderID ?? null;
       raw.name = folder.name;
@@ -69,7 +72,7 @@ export async function storeNewFolder(folder: Folder) {
 export async function storeNewList(list: List) {
   await database.write(async () => {
     const newList = await database.get<wList>('lists').create(raw => {
-      raw.id2 = safeUUID();
+      raw.id2 = list.id || safeUUID();
       raw.title = list.title;
       raw.description = list.description;
       raw.cover_image_url = list.coverImageURL;
@@ -85,7 +88,7 @@ export async function storeNewList(list: List) {
 export async function storeNewItem(item: Item) {
   await database.write(async () => {
     await database.get<wItem>('items').create(raw => {
-      raw.id2 = safeUUID();
+      raw.id2 = item.id || safeUUID();
       raw.list_id = item.listID;
       raw.title = item.title ?? '';
       raw.content = item.content;
