@@ -92,13 +92,11 @@ const fieldNameMap: { [key: string]: { [key: string]: string } } = {
   }
 };
 
-// Utility function to convert Unix timestamp (seconds or ms) to SQL date string
-function unixToSqlTimestamp(unix: number | null | undefined): string | null {
-  if (!unix) return null;
-  // If unix is in milliseconds, use as is; if in seconds, multiply by 1000
-  const ms = unix > 1e12 ? unix : unix * 1000;
-  const date = new Date(ms);
-  return date.toISOString().replace('T', ' ').substring(0, 19);
+// Utility function to convert ISO string to Date or null
+function isoToDate(val: any): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  return new Date(val);
 }
 
 export async function syncUserData() {
@@ -135,8 +133,18 @@ export async function syncUserData() {
           data?.forEach(record => {
             const transformedRecord: any = {};
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
-              transformedRecord[watermelonField] = record[supabaseField.toLowerCase()];
+              let value = record[supabaseField.toLowerCase()];
+              // Convert date fields to Date objects
+              if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
+                value = value ? new Date(value) : null;
+              }
+              transformedRecord[watermelonField] = value;
             });
+            // Ensure 'id' field exists for WatermelonDB
+            if (transformedRecord.id2 && !transformedRecord.id) {
+              transformedRecord.id = transformedRecord.id2;
+              delete transformedRecord.id2;
+            }
             console.log(`[syncService] Transformed record for ${watermelonTable}:`, transformedRecord);
             // If the record was created after lastPulledAt, it's a new record
             if (new Date(record.createdat) > new Date(lastPulledAt || 0)) {
@@ -168,9 +176,10 @@ export async function syncUserData() {
             const transformedRecord: any = {};
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
               let value = record[watermelonField];
-              // if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
-              //   value = unixToSqlTimestamp(value);
-              // }
+              // Convert date fields to ISO strings using Date's toISOString
+              if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
+                value = value ? new Date(value).toISOString() : null;
+              }
               transformedRecord[supabaseField] = value;
             });
             console.log(`[syncService] Prepared record to upsert for ${supabaseTable}:`, transformedRecord);

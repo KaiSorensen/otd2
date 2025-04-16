@@ -74,6 +74,8 @@ export async function storeNewList(list: List) {
       raw.description = list.description;
       raw.cover_image_url = list.coverImageURL;
       raw.is_public = list.isPublic;
+      raw.created_at = new Date();
+      raw.updated_at = new Date();
     });
   });
   // Sync after list creation
@@ -89,6 +91,8 @@ export async function storeNewItem(item: Item) {
       raw.content = item.content;
       raw.image_urls = item.imageURLs ?? [];
       raw.order_index = item.orderIndex ?? 0;
+      raw.created_at = new Date();
+      raw.updated_at = new Date();
     });
   });
   // Sync after item creation
@@ -585,6 +589,7 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
       if (updates.email) raw.email = updates.email;
       if (updates.avatarURL) raw.avatar_url = updates.avatarURL;
       if (updates.notifsEnabled !== undefined) raw.notifs_enabled = updates.notifsEnabled;
+      raw.updated_at = new Date();
     });
   });
   // Sync after user update
@@ -597,6 +602,7 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
     await folder.update((raw: wFolder) => {
       if (updates.name) raw.name = updates.name;
       if (updates.parentFolderID !== undefined) raw.parent_folder_id = updates.parentFolderID;
+      raw.updated_at = new Date();
     });
   });
   // Sync after folder update
@@ -611,6 +617,7 @@ export async function updateList(listId: string, updates: Partial<List>): Promis
       if (updates.description) raw.description = updates.description;
       if (updates.coverImageURL) raw.cover_image_url = updates.coverImageURL;
       if (updates.isPublic !== undefined) raw.is_public = updates.isPublic;
+      raw.updated_at = new Date();
     });
   });
   // Sync after list update
@@ -625,6 +632,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>): Promis
       if (updates.content) raw.content = updates.content;
       if (updates.imageURLs) raw.image_urls = updates.imageURLs;
       if (updates.orderIndex !== undefined) raw.order_index = updates.orderIndex;
+      raw.updated_at = new Date();
     });
   });
   // Sync after item update
@@ -664,6 +672,7 @@ export async function updateLibraryListConfig(userID: string, folderID: string, 
       if (config.notifyTime) raw.notify_time = config.notifyTime;
       if (config.notifyDays) raw.notify_days = config.notifyDays;
       if (config.orderIndex !== undefined) raw.order_index = config.orderIndex;
+      raw.updated_at = new Date();
     });
   });
 }
@@ -731,6 +740,8 @@ export async function addListToFolder(ownerID: string, folderID: string, listID:
       raw.notify_time = config?.notifyTime || null;
       raw.notify_days = config?.notifyDays || null;
       raw.order_index = config?.orderIndex || 0;
+      raw.created_at = new Date();
+      raw.updated_at = new Date();
     });
   });
   // Sync after adding list to folder
@@ -767,6 +778,7 @@ export async function moveListToFolder(ownerID: string, oldFolderID: string, new
 
     if (libraryList.length) {
       const oldConfig = libraryList[0];
+      const oldCreatedAt = oldConfig.created_at || new Date();
       await oldConfig.destroyPermanently();
 
       await database.get<wLibraryList>('librarylists').create(raw => {
@@ -780,6 +792,8 @@ export async function moveListToFolder(ownerID: string, oldFolderID: string, new
         raw.notify_time = oldConfig.notify_time;
         raw.notify_days = oldConfig.notify_days;
         raw.order_index = oldConfig.order_index;
+        raw.created_at = oldCreatedAt;
+        raw.updated_at = new Date();
       });
     } else {
       // If no old config found, add with default settings

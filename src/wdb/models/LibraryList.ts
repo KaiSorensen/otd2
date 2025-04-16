@@ -22,8 +22,8 @@ export default class LibraryList extends Model {
   @field('current_user_id') current_user_id!: string | null
   @date('notify_time') notify_time!: Date | null
   @text('notify_days') notify_days!: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun' | null
-  @readonly @date('created_at') created_at!: Date
-  @readonly @date('updated_at') updated_at!: Date
+  @date('created_at') created_at!: Date
+  @date('updated_at') updated_at!: Date
 
   @immutableRelation('users', 'owner_id') owner!: any
   @immutableRelation('folders', 'folder_id') folder!: any

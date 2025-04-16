@@ -16,8 +16,8 @@ export default class User extends Model {
   @field('avatar_url') avatar_url!: string | null
   @field('notifs_enabled') notifs_enabled!: boolean
 
-  @readonly @date('created_at') created_at!: Date
-  @readonly @date('updated_at') updated_at!: Date
+  @date('created_at') created_at!: Date
+  @date('updated_at') updated_at!: Date
 
   @children('folders') folders!: any
   @children('lists') lists!: any

@@ -14,8 +14,8 @@ export default class Item extends Model {
   @field('content') content!: string
   @field('image_urls') image_urls!: string[]
   @field('order_index') order_index!: number | null
-  @readonly @date('created_at') created_at!: Date
-  @readonly @date('updated_at') updated_at!: Date
+  @date('created_at') created_at!: Date
+  @date('updated_at') updated_at!: Date
 
   @immutableRelation('lists', 'list_id') list!: any
 } 

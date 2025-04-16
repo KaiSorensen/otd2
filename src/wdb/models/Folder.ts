@@ -14,8 +14,8 @@ export default class Folder extends Model {
   @field('owner_id') owner_id!: string
   @field('parent_folder_id') parent_folder_id!: string | null
   @text('name') name!: string
-  @readonly @date('created_at') created_at!: Date
-  @readonly @date('updated_at') updated_at!: Date
+  @date('created_at') created_at!: Date
+  @date('updated_at') updated_at!: Date
 
   @immutableRelation('users', 'owner_id') owner!: any
   @immutableRelation('folders', 'parent_folder_id') parentFolder!: any

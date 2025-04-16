@@ -25,8 +25,8 @@ export default class List extends Model {
   @field('notify_time') notify_time!: Date | null
   @field('notify_days') notify_days!: string | null
   @field('order_index') order_index!: number
-  @readonly @date('created_at') created_at!: Date
-  @readonly @date('updated_at') updated_at!: Date
+  @date('created_at') created_at!: Date
+  @date('updated_at') updated_at!: Date
 
   @immutableRelation('users', 'owner_id') owner!: any
   @children('items') items!: any
