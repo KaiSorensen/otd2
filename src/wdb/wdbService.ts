@@ -55,6 +55,8 @@ export async function storeNewUser(user: User) {
 }
 
 export async function storeNewFolder(folder: Folder) {
+  console.log('[storeNewFolder] Incoming folder.id:', folder.id);
+
   await database.write(async () => {
     await database.get<wFolder>('folders').create(raw => {
       raw.id2 = folder.id || safeUUID();
@@ -70,13 +72,35 @@ export async function storeNewFolder(folder: Folder) {
 }
 
 export async function storeNewList(list: List) {
+  console.log('[storeNewList] Incoming list.id:', list.id);
+
+  const idToUse = list.id || safeUUID();
+
   await database.write(async () => {
-    const newList = await database.get<wList>('lists').create(raw => {
-      raw.id2 = list.id || safeUUID();
+    await database.get<wList>('lists').create(raw => {
+      raw.id2 = idToUse;
+      raw.owner_id = list.ownerID;
       raw.title = list.title;
       raw.description = list.description;
       raw.cover_image_url = list.coverImageURL;
       raw.is_public = list.isPublic;
+      raw.created_at = new Date();
+      raw.updated_at = new Date();
+    });
+  });
+
+  await database.write(async () => {
+    await database.get<wLibraryList>('librarylists').create(raw => {
+      raw.id2 = safeUUID();
+      raw.owner_id = list.ownerID;
+      raw.list_id = idToUse;
+      raw.folder_id = list.folderID;
+      raw.sort_order = list.sortOrder;
+      raw.today = list.today;
+      raw.current_item = list.currentItem;
+      raw.notify_on_new = list.notifyOnNew;
+      raw.notify_time = list.notifyTime;
+      raw.notify_days = list.notifyDays;
       raw.created_at = new Date();
       raw.updated_at = new Date();
     });
@@ -86,6 +110,8 @@ export async function storeNewList(list: List) {
 }
 
 export async function storeNewItem(item: Item) {
+  console.log('[storeNewItem] Incoming item.id:', item.id);
+
   await database.write(async () => {
     await database.get<wItem>('items').create(raw => {
       raw.id2 = item.id || safeUUID();
@@ -177,8 +203,8 @@ export async function retrieveList(userID: string, listId: string): Promise<List
     // Get library configuration if it exists
     const libraryList = await database.get<wLibraryList>('librarylists')
       .query(
-        Q.where('ownerID', userID),
-        Q.where('listID', listId)
+        Q.where('owner_id', userID),
+        Q.where('list_id', listId)
       )
       .fetch();
 
@@ -264,15 +290,21 @@ export async function populateUserLists(user: User) {
     const lists: List[] = [];
     for (const libraryEntry of libraryLists) {
       const list = await database.get<wList>('lists')
-        .find(libraryEntry.list_id);
+        .query(Q.where('id2', libraryEntry.list_id))
+        .fetch();
+
+      if (!list || list.length === 0) {
+        console.error('List not found');
+        continue;
+      }
 
       lists.push(new List(
-        list.id2,
-        list.owner_id,
-        list.title,
-        list.description,
-        list.cover_image_url,
-        list.is_public,
+        list[0].id2,
+        list[0].owner_id,
+        list[0].title,
+        list[0].description,
+        list[0].cover_image_url,
+        list[0].is_public,
         user.id,
         libraryEntry.folder_id,
         libraryEntry.sort_order,
@@ -551,7 +583,7 @@ export async function getTodayItemsForUser(userId: string): Promise<Item[]> {
   const listIds = todayLists.map(list => list.id);
   const items = await database.get<wItem>('items')
     .query(
-      Q.where('listid', Q.oneOf(listIds))
+      Q.where('list_id', Q.oneOf(listIds))
     )
     .fetch();
 
@@ -568,7 +600,7 @@ export async function getTodayItemsForUser(userId: string): Promise<Item[]> {
 export async function getItemsInList(listId: string): Promise<Item[]> {
   const items = await database.get<wItem>('items')
     .query(
-      Q.where('listid', listId)
+      Q.where('list_id', listId)
     )
     .fetch();
 

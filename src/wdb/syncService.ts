@@ -133,7 +133,7 @@ export async function syncUserData() {
           data?.forEach(record => {
             const transformedRecord: any = {};
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
-              let value = record[supabaseField.toLowerCase()];
+              let value = record[supabaseField];
               // Convert date fields to Date objects
               if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
                 value = value ? new Date(value) : null;
