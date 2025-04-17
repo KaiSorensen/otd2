@@ -598,20 +598,24 @@ export async function getTodayItemsForUser(userId: string): Promise<Item[]> {
 }
 
 export async function getItemsInList(listId: string): Promise<Item[]> {
+  console.log('[getItemsInList] Starting to fetch items for list:', listId);
   const items = await database.get<wItem>('items')
-    .query(
-      Q.where('list_id', listId)
-    )
+    .query(Q.where('list_id', listId))
     .fetch();
-
-  return items.map((item) => new Item(
-    item.id2,
-    item.list_id,
-    item.title,
-    item.content,
-    item.image_urls,
-    item.order_index
-  ));
+  
+  console.log('[getItemsInList] Retrieved items:', items.length);
+  
+  return items.map((item) => {
+    console.log('[getItemsInList] Mapping item:', item.id2, item.title);
+    return new Item(
+      item.id2,
+      item.list_id,
+      item.title,
+      item.content,
+      item.image_urls,
+      item.order_index
+    );
+  });
 }
 
 // ======= SINGLE UPDATE FUNCTIONS =======
@@ -661,8 +665,11 @@ export async function updateList(listId: string, updates: Partial<List>): Promis
 
 export async function updateItem(itemId: string, updates: Partial<Item>): Promise<void> {
   await database.write(async () => {
-    const item = await database.get<wItem>('items').find(itemId);
-    await item.update((raw: wItem) => {
+    const item = await database.get<wItem>('items').query(Q.where('id2', itemId)).fetch();
+    if (!item || item.length === 0) {
+      throw new Error('Item not found');
+    }
+    await item[0].update((raw: wItem) => {
       if (updates.title) raw.title = updates.title;
       if (updates.content) raw.content = updates.content;
       if (updates.imageURLs) raw.image_urls = updates.imageURLs;

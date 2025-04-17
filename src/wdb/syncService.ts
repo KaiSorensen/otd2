@@ -171,7 +171,11 @@ export async function syncUserData() {
             const transformedRecord: any = {};
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
               let value = record[watermelonField];
-              // Convert date fields to ISO strings using Date's toISOString
+              // Fix for image_urls/imageurls: always send an array
+              if (watermelonTable === 'items' && (watermelonField === 'image_urls' || watermelonField === 'imageurls')) {
+                if (!Array.isArray(value)) value = [];
+              }
+              // Convert date fields to ISO strings
               if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
                 value = value ? new Date(value).toISOString() : null;
               }

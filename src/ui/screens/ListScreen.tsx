@@ -219,7 +219,11 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
   const [sortOrder, setSortOrder] = useState<SortOrderType>(list.sortOrder as SortOrderType || 'date-first');
   const [isSortOrderOpen, setIsSortOrderOpen] = useState(false);
 
- 
+  // Add useEffect to fetch items when component mounts
+  useEffect(() => {
+    fetchItems();
+    fetchListOwner();
+  }, []);
 
   // Function to fetch items
   const fetchItems = async () => {
@@ -553,7 +557,11 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
           <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
         ) : (
           <View style={styles.itemsContainer}>
-            {items.map((item) => renderItem({ item }))}
+            {items.map((item) => (
+              <View key={item.id}>
+                {renderItem({ item })}
+              </View>
+            ))}
             {items.length === 0 && (
               <Text style={[styles.emptyMessage, { color: colors.textTertiary }]}>No items in this list yet</Text>
             )}
