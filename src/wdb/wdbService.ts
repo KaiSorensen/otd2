@@ -550,15 +550,16 @@ export async function getTodayListsForUser(userId: string): Promise<List[]> {
   const lists: List[] = [];
   for (const libraryEntry of libraryLists) {
     const list = await database.get<wList>('lists')
-      .find(libraryEntry.list_id);
+      .query(Q.where('id2', libraryEntry.list_id))
+      .fetch();
 
     lists.push(new List(
-      list.id2,
-      list.owner_id,
-      list.title,
-      list.description,
-      list.cover_image_url,
-      list.is_public,
+      list[0].id2,
+      list[0].owner_id,
+      list[0].title,
+      list[0].description,
+      list[0].cover_image_url,
+      list[0].is_public,
       userId,
       libraryEntry.folder_id,
       libraryEntry.sort_order,
@@ -622,8 +623,11 @@ export async function getItemsInList(listId: string): Promise<Item[]> {
 
 export async function updateUser(userId: string, updates: Partial<User>): Promise<void> {
   await database.write(async () => {
-    const user = await database.get<wUser>('users').find(userId);
-    await user.update((raw: wUser) => {
+    const user = await database.get<wUser>('users').query(Q.where('id2', userId)).fetch();
+    if (!user || user.length === 0) {
+      throw new Error('User not found');
+    }
+    await user[0].update((raw: wUser) => {
       if (updates.username) raw.username = updates.username;
       if (updates.email) raw.email = updates.email;
       if (updates.avatarURL) raw.avatar_url = updates.avatarURL;
@@ -637,8 +641,11 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
 
 export async function updateFolder(folderId: string, updates: Partial<Folder>): Promise<void> {
   await database.write(async () => {
-    const folder = await database.get<wFolder>('folders').find(folderId);
-    await folder.update((raw: wFolder) => {
+    const folder = await database.get<wFolder>('folders').query(Q.where('id2', folderId)).fetch();
+    if (!folder || folder.length === 0) {
+      throw new Error('Folder not found');
+    }
+    await folder[0].update((raw: wFolder) => {
       if (updates.name) raw.name = updates.name;
       if (updates.parentFolderID !== undefined) raw.parent_folder_id = updates.parentFolderID;
       raw.updated_at = new Date();
@@ -650,8 +657,11 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
 
 export async function updateList(listId: string, updates: Partial<List>): Promise<void> {
   await database.write(async () => {
-    const list = await database.get<wList>('lists').find(listId);
-    await list.update((raw: wList) => {
+    const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
+    if (!list || list.length === 0) {
+      throw new Error('List not found');
+    }
+    await list[0].update((raw: wList) => {
       if (updates.title) raw.title = updates.title;
       if (updates.description) raw.description = updates.description;
       if (updates.coverImageURL) raw.cover_image_url = updates.coverImageURL;
@@ -723,8 +733,11 @@ export async function updateLibraryListConfig(userID: string, folderID: string, 
 
 export async function deleteUser(userId: string): Promise<void> {
   await database.write(async () => {
-    const user = await database.get<wUser>('users').find(userId);
-    await user.destroyPermanently();
+    const user = await database.get<wUser>('users').query(Q.where('id2', userId)).fetch();
+    if (!user || user.length === 0) {
+      throw new Error('User not found');
+    }
+    await user[0].destroyPermanently();
   });
   // Sync after user deletion
   await syncUserData();
@@ -732,8 +745,11 @@ export async function deleteUser(userId: string): Promise<void> {
 
 export async function deleteFolder(folderId: string): Promise<void> {
   await database.write(async () => {
-    const folder = await database.get<wFolder>('folders').find(folderId);
-    await folder.destroyPermanently();
+    const folder = await database.get<wFolder>('folders').query(Q.where('id2', folderId)).fetch();
+    if (!folder || folder.length === 0) {
+      throw new Error('Folder not found');
+    }
+    await folder[0].destroyPermanently();
   });
   // Sync after folder deletion
   await syncUserData();
@@ -741,8 +757,11 @@ export async function deleteFolder(folderId: string): Promise<void> {
 
 export async function deleteList(listId: string): Promise<void> {
   await database.write(async () => {
-    const list = await database.get<wList>('lists').find(listId);
-    await list.destroyPermanently();
+    const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
+    if (!list || list.length === 0) {
+      throw new Error('List not found');
+    }
+    await list[0].destroyPermanently();
   });
   // Sync after list deletion
   await syncUserData();
@@ -750,8 +769,11 @@ export async function deleteList(listId: string): Promise<void> {
 
 export async function deleteItem(itemId: string): Promise<void> {
   await database.write(async () => {
-    const item = await database.get<wItem>('items').find(itemId);
-    await item.destroyPermanently();
+    const item = await database.get<wItem>('items').query(Q.where('id2', itemId)).fetch();
+    if (!item || item.length === 0) {
+      throw new Error('Item not found');
+    }
+    await item[0].destroyPermanently();
   });
   // Sync after item deletion
   await syncUserData();
