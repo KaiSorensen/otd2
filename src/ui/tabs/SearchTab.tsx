@@ -448,7 +448,7 @@ const SearchScreen = () => {
             <Icon name="rocket" size={80} color={colors.primary} />
           </Animated.View>
           <Text style={[styles.easterEggTitle, { color: colors.textPrimary, fontSize: 30 }]}>
-            Miss you boo beaasdfr &lt;3
+            Miss you boo bear &lt;3
           </Text>
         </View>
       ) : results.length > 0 ? (
