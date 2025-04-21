@@ -399,78 +399,6 @@ export async function populateSubFolders(folder: Folder) {
 
 // ======= SEARCH FUNCTIONS =======
 
-export async function getUsersBySubstring(substring: string): Promise<User[]> {
-  const users = await database.get<wUser>('users')
-    .query(
-      Q.where('username', Q.like(substring))
-    )
-    .fetch();
-
-  return users.map((user) => new User(
-    user.id2,
-    user.username,
-    user.email,
-    user.avatar_url,
-    user.notifs_enabled
-  ));
-}
-
-export async function getPublicListsBySubstring(substring: string): Promise<List[]> {
-  const lists = await database.get<wList>('lists')
-    .query(
-      Q.and(
-        Q.where('is_public', true),
-        Q.where('title', Q.like(substring))
-      )
-    )
-    .fetch();
-
-  return lists.map((list) => new List(
-    list.id2,
-    list.owner_id,
-    list.title,
-    list.description,
-    list.cover_image_url,
-    list.is_public,
-    null,
-    '',
-    "date-first",
-    false,
-    null,
-    false,
-    null,
-    null,
-    0
-  ));
-}
-
-export async function getPublicListsByUser(userId: string, viewerUserId?: string): Promise<List[]> {
-  const lists = await database.get<wList>('lists')
-    .query(
-      Q.where('owner_id', userId),
-      Q.where('is_public', true)
-    )
-    .fetch();
-
-  return lists.map((list) => new List(
-    list.id2,
-    list.owner_id,
-    list.title,
-    list.description,
-    list.cover_image_url,
-    list.is_public,
-    viewerUserId || null,
-    '',
-    "date-first",
-    false,
-    null,
-    false,
-    null,
-    null,
-    0
-  ));
-}
-
 export async function getUserListsBySubstring(userID: string, substring: string): Promise<List[]> {
   const lists = await database.get<wList>('lists')
     .query(
@@ -501,35 +429,48 @@ export async function getUserListsBySubstring(userID: string, substring: string)
 }
 
 export async function getLibraryItemsBySubstring(user: User, substring: string): Promise<Item[]> {
+  console.log('getting library items by substring:', substring);
+  console.log('user listMap size:', user.listMap.size);
+
   const libraryListIDs = Array.from(user.listMap.keys());
+  console.log('library list IDs:', libraryListIDs);
+
   if (!libraryListIDs.length) {
+    console.log('no library lists found');
     return [];
   }
 
   let items: Item[] = [];
   for (const listID of libraryListIDs) {
+    console.log('searching items in list:', listID);
     const listItems = await database.get<wItem>('items')
       .query(
         Q.and(
           Q.where('list_id', listID),
           Q.or(
-            Q.where('title', Q.like(substring)),
-            Q.where('content', Q.like(substring))
+            Q.where('title', Q.like(`%${substring}%`)),
+            Q.where('content', Q.like(`%${substring}%`))
           )
         )
       )
       .fetch();
 
-    items = items.concat(listItems.map((item) => new Item(
-      item.id2,
-      item.list_id,
-      item.title,
-      item.content,
-      item.image_urls,
-      item.order_index
-    )));
+    console.log('found items in list:', listItems.length);
+    
+    items = items.concat(listItems.map((item) => {
+      console.log('mapping item:', item.id2, item.title);
+      return new Item(
+        item.id2,
+        item.list_id,
+        item.title,
+        item.content,
+        item.image_urls,
+        item.order_index
+      );
+    }));
   }
 
+  console.log('total items found:', items.length);
   return items;
 }
 

@@ -14,16 +14,19 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
-  getPublicListsBySubstring,
-  getUserListsBySubstring,
   getLibraryItemsBySubstring,
-  getUsersBySubstring
+  getUserListsBySubstring,
 } from '../../wdb/wdbService';
+import {
+  getPublicListsBySubstring,
+  getUsersBySubstring
+} from '../../supabase/databaseService';
 import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { User } from '../../classes/User';
 import { useAuth } from '../../contexts/UserContext';
 import { useColors } from '../../contexts/ColorContext';
+import { useNetwork } from '../../contexts/NetworkContext';
 import debounce from 'lodash.debounce';
 import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
@@ -35,7 +38,7 @@ const stripHtml = (html: string): string => {
 };
 
 // Define filter types
-type FilterType = 'library' | 'lists' | 'items' | 'users';
+type FilterType = 'library' | 'lists' | 'items' | 'users' | null;
 
 // Define result types for the union type
 type SearchResult = {
@@ -46,8 +49,9 @@ type SearchResult = {
 const SearchScreen = () => {
   const { currentUser } = useAuth();
   const { colors } = useColors();
+  const { isInternetReachable } = useNetwork();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('library');
+  const [activeFilter, setActiveFilter] = useState<FilterType>(null);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedList, setSelectedList] = useState<List | null>(null);
@@ -115,58 +119,56 @@ const SearchScreen = () => {
       // Search based on the active filter
       switch (filter) {
         case 'library':
-          // Search both user's lists and items
+          // Search only in local database (watermelondb)
           const userLists = await getUserListsBySubstring(currentUser.id, term);
           const userItems = await getLibraryItemsBySubstring(currentUser, term);
 
-          // Add lists to results
           searchResults = [
-            ...userLists.map(list => ({ type: 'list' as const, data: list })),
-            ...userItems.map(item => ({ type: 'item' as const, data: item }))
+            ...userLists.map((list: List) => ({ type: 'list' as const, data: list })),
+            ...userItems.map((item: Item) => ({ type: 'item' as const, data: item }))
           ];
-
-          // If we have fewer than 10 results, also search public lists and users
-          if (searchResults.length < 10) {
-            const publicLists = await getPublicListsBySubstring(term);
-            const publicUsers = await getUsersBySubstring(term);
-
-            // Add public results, but prioritize user's own content
-            searchResults = [
-              ...searchResults,
-              ...publicLists
-                .filter(list => !userLists.some(ul => ul.id === list.id))
-                .map(list => ({ type: 'list' as const, data: list })),
-              ...publicUsers.map(user => ({ type: 'user' as const, data: user }))
-            ];
-          }
           break;
 
         case 'lists':
-          // Search user's lists first
-          const ownLists = await getUserListsBySubstring(currentUser.id, term);
+          // Search in both local and remote databases
+          const localLists = await getUserListsBySubstring(currentUser.id, term);
+          const publicLists = await getPublicListsBySubstring(term, isInternetReachable);
 
-          // Then search public lists
-          const allPublicLists = await getPublicListsBySubstring(term);
-
-          // Combine results, prioritizing user's own lists
           searchResults = [
-            ...ownLists.map(list => ({ type: 'list' as const, data: list })),
-            ...allPublicLists
-              .filter(list => !ownLists.some(ol => ol.id === list.id))
-              .map(list => ({ type: 'list' as const, data: list }))
+            ...localLists.map((list: List) => ({ type: 'list' as const, data: list })),
+            ...publicLists
+              .filter((list: List) => !localLists.some((ul: List) => ul.id === list.id))
+              .map((list: List) => ({ type: 'list' as const, data: list }))
           ];
           break;
 
         case 'items':
-          // Only search items in user's library
+          // Search only in local database (watermelondb)
           const items = await getLibraryItemsBySubstring(currentUser, term);
           searchResults = items.map(item => ({ type: 'item' as const, data: item }));
           break;
 
         case 'users':
-          // Search for users with public lists
-          const users = await getUsersBySubstring(term);
-          searchResults = users.map(user => ({ type: 'user' as const, data: user }));
+          // Search in remote database (supabase)
+          const users = await getUsersBySubstring(term, isInternetReachable);
+          searchResults = users.map((user: User) => ({ type: 'user' as const, data: user }));
+          break;
+
+        case null:
+          // Search in both local and remote databases
+          const allLocalLists = await getUserListsBySubstring(currentUser.id, term);
+          const allLocalItems = await getLibraryItemsBySubstring(currentUser, term);
+          const allPublicLists = await getPublicListsBySubstring(term, isInternetReachable);
+          const allUsers = await getUsersBySubstring(term, isInternetReachable);
+
+          searchResults = [
+            ...allLocalLists.map((list: List) => ({ type: 'list' as const, data: list })),
+            ...allLocalItems.map((item: Item) => ({ type: 'item' as const, data: item })),
+            ...allPublicLists
+              .filter((list: List) => !allLocalLists.some((ul: List) => ul.id === list.id))
+              .map((list: List) => ({ type: 'list' as const, data: list })),
+            ...allUsers.map((user: User) => ({ type: 'user' as const, data: user }))
+          ];
           break;
       }
 
@@ -180,7 +182,7 @@ const SearchScreen = () => {
 
   // Handle filter chip selection
   const handleFilterChange = (filter: FilterType) => {
-    setActiveFilter(filter);
+    setActiveFilter(activeFilter === filter ? null : filter);
   };
 
   // Render different result types
@@ -378,7 +380,7 @@ const SearchScreen = () => {
                 activeFilter === 'library' && styles.selectedChipText
               ]}
             >
-              Library
+              Your Library
             </Text>
           </TouchableOpacity>
 
