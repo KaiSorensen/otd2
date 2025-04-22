@@ -64,7 +64,7 @@ export class List {
     get ownerID(): string { return this._ownerID; }
     get currentUserID(): string | null { return this._currentUserID; }
     get folderID(): string { return this._folderID; }
-    set folderID(value: string) {this.folderID = value}
+    set folderID(value: string) { this._folderID = value; }
     get orderIndex(): number { return this._orderIndex; }
     set orderIndex(value: number) { this._orderIndex = value; }
 

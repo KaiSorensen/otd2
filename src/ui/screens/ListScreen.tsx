@@ -234,6 +234,16 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
     }
   }, [currentUser, initialList.id]);
 
+  // Add useEffect to update list state when list properties change
+  useEffect(() => {
+    if (currentUser) {
+      const libraryList = currentUser.listMap.get(list.id);
+      if (libraryList) {
+        setList(libraryList);
+      }
+    }
+  }, [currentUser, list.id]);
+
   // Local state for list properties that can be modified
   const [isToday, setIsToday] = useState(list.today || false);
   const [isPublic, setIsPublic] = useState(list.isPublic || false);
@@ -383,6 +393,11 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       }
       // Refresh the User to update the library UI
       await currentUser.refresh();
+      // Update the local list state to reflect it's now in the library
+      const updatedList = currentUser.listMap.get(list.id);
+      if (updatedList) {
+        setList(updatedList);
+      }
     } catch (error) {
       console.error('Error adding list to library:', error);
       Alert.alert('Error', 'Failed to add list to library. Please try again.');

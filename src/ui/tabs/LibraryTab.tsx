@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,23 @@ const LibraryScreen = () => {
   const [selectedList, setSelectedList] = useState<List | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
+
+  // Add useEffect to refresh expanded folders when currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      const newExpandedFolders = new Set<string>();
+      const addFolderIds = (folders: Folder[]) => {
+        for (const folder of folders) {
+          newExpandedFolders.add(folder.id);
+          if (folder.subFolders.length > 0) {
+            addFolderIds(folder.subFolders);
+          }
+        }
+      };
+      addFolderIds(currentUser.rootFolders);
+      setExpandedFolders(newExpandedFolders);
+    }
+  }, [currentUser]);
 
   const toggleFolder = (folderId: string) => {
     const newExpandedFolders = new Set(expandedFolders);
