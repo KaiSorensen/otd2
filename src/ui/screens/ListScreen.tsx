@@ -208,9 +208,10 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
   );
 };
 
-const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
+const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) => {
   const { currentUser } = useAuth();
   const { colors, isDarkMode } = useColors();
+  const [list, setList] = useState<List>(initialList);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSortDropdownOpen, setSortDropdownOpen] = useState(false);
@@ -223,6 +224,16 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [listOwner, setListOwner] = useState<User | null>(null);
   
+  // Add useEffect to check if list is in library and use that version if it exists
+  useEffect(() => {
+    if (currentUser) {
+      const libraryList = currentUser.listMap.get(initialList.id);
+      if (libraryList) {
+        setList(libraryList);
+      }
+    }
+  }, [currentUser, initialList.id]);
+
   // Local state for list properties that can be modified
   const [isToday, setIsToday] = useState(list.today || false);
   const [isPublic, setIsPublic] = useState(list.isPublic || false);
@@ -230,25 +241,18 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
   const [sortOrder, setSortOrder] = useState<SortOrderType>(list.sortOrder as SortOrderType || 'date-first');
   const [isSortOrderOpen, setIsSortOrderOpen] = useState(false);
 
-  // Add useEffect to fetch items and owner when component mounts
+  // Add useEffect to fetch items and owner when component mounts or list changes
   useEffect(() => {
     fetchItems();
     fetchOwner();
-  }, []);
-
-  // Add useEffect to fetch folders when modal is opened
-  useEffect(() => {
-    if (isAddToLibraryModalVisible && currentUser) {
-      fetchUserFolders();
-    }
-  }, [isAddToLibraryModalVisible, currentUser]);
+  }, [list]);
 
   // Function to fetch items
   const fetchItems = async () => {
     setLoading(true);
     try {
       // if the list is in our library, then we need to fetch the items from the library
-      if (currentUser?.listMap.has(list.id)) {
+      if (list.folderID) {
         const listItems = await local_getItemsInList(list.id);
         setItems(listItems);
       } else {
