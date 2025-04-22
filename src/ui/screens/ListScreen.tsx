@@ -247,6 +247,13 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
     fetchOwner();
   }, [list]);
 
+  // Add useEffect to fetch folders when modal is opened
+  useEffect(() => {
+    if (isAddToLibraryModalVisible && currentUser) {
+      fetchUserFolders();
+    }
+  }, [isAddToLibraryModalVisible, currentUser]);
+
   // Function to fetch items
   const fetchItems = async () => {
     setLoading(true);
