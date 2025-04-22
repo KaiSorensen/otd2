@@ -189,11 +189,22 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
     });
   }, [visible, list]);
 
+  // Batch settings changes
+  const handleSettingChange = (key: keyof typeof localSettings, value: any) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Save all changes when modal is closed
+  const handleClose = () => {
+    onSave(localSettings);
+    onClose();
+  };
+
   const handleFolderChange = async (newFolderId: string) => {
     if (!currentUser) return;
     
     try {
-      await currentUser.moveListToFolder(list, newFolderId);
+      await currentUser.switchFolderOfList(list, newFolderId);
       onSave({ folderID: newFolderId });
     } catch (error) {
       console.error('Error moving list to new folder:', error);
@@ -229,109 +240,18 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
     }
   };
 
-  // Owner settings section
-  const renderOwnerSettings = () => (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Owner Settings</Text>
-      <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Public</Text>
-        <Switch
-          value={localSettings.isPublic}
-          onValueChange={(value) => {
-            setLocalSettings(prev => ({ ...prev, isPublic: value }));
-            onSave({ isPublic: value });
-          }}
-          trackColor={{ false: colors.backgroundSecondary, true: `${colors.primary}80` }}
-          thumbColor={localSettings.isPublic ? colors.primary : colors.backgroundTertiary}
-        />
-      </View>
-      <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Description</Text>
-        <Text style={[styles.settingValue, { color: colors.textSecondary }]} numberOfLines={2}>
-          {list.description || 'No description'}
-        </Text>
-      </View>
-      <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Cover Image</Text>
-        <Text style={[styles.settingValue, { color: colors.textSecondary }]}>
-          {list.coverImageURL ? 'Has cover image' : 'No cover image'}
-        </Text>
-      </View>
-    </View>
-  );
-
-  // Library settings section
-  const renderLibrarySettings = () => (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Library Settings</Text>
-      <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Today</Text>
-        <Switch
-          value={localSettings.today}
-          onValueChange={(value) => {
-            setLocalSettings(prev => ({ ...prev, today: value }));
-            onSave({ today: value });
-          }}
-          trackColor={{ false: colors.backgroundSecondary, true: `${colors.primary}80` }}
-          thumbColor={localSettings.today ? colors.primary : colors.backgroundTertiary}
-        />
-      </View>
-      <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notify on new</Text>
-        <Switch
-          value={localSettings.notifyOnNew}
-          onValueChange={(value) => {
-            setLocalSettings(prev => ({ ...prev, notifyOnNew: value }));
-            onSave({ notifyOnNew: value });
-          }}
-          trackColor={{ false: colors.backgroundSecondary, true: `${colors.primary}80` }}
-          thumbColor={localSettings.notifyOnNew ? colors.primary : colors.backgroundTertiary}
-        />
-      </View>
-      <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Sort Order</Text>
-        <SortOrderDropdown
-          value={localSettings.sortOrder}
-          onChange={(value) => {
-            setLocalSettings(prev => ({ ...prev, sortOrder: value }));
-            onSave({ sortOrder: value });
-          }}
-          isOpen={isSortOrderOpen}
-          toggleOpen={() => setIsSortOrderOpen(!isSortOrderOpen)}
-          colors={colors}
-        />
-      </View>
-      {localSettings.notifyOnNew && (
-        <>
-          <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notify Time</Text>
-            <Text style={[styles.settingValue, { color: colors.textSecondary }]}>
-              {list.notifyTime ? new Date(list.notifyTime).toLocaleTimeString() : 'Not set'}
-            </Text>
-          </View>
-          <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-            <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notify Days</Text>
-            <Text style={[styles.settingValue, { color: colors.textSecondary }]}>
-              {list.notifyDays || 'Not set'}
-            </Text>
-          </View>
-        </>
-      )}
-    </View>
-  );
-
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
         <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>List Settings</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={handleClose}>
               <Icon name="close" size={24} color={colors.iconSecondary} />
             </TouchableOpacity>
           </View>
@@ -351,10 +271,81 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
             </View>
 
             {/* Owner Settings */}
-            {isOwner && renderOwnerSettings()}
+            {isOwner && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Owner Settings</Text>
+                <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Public</Text>
+                  <Switch
+                    value={localSettings.isPublic}
+                    onValueChange={(value) => handleSettingChange('isPublic', value)}
+                    trackColor={{ false: colors.backgroundSecondary, true: `${colors.primary}80` }}
+                    thumbColor={localSettings.isPublic ? colors.primary : colors.backgroundTertiary}
+                  />
+                </View>
+                <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Description</Text>
+                  <Text style={[styles.settingValue, { color: colors.textSecondary }]} numberOfLines={2}>
+                    {list.description || 'No description'}
+                  </Text>
+                </View>
+                <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Cover Image</Text>
+                  <Text style={[styles.settingValue, { color: colors.textSecondary }]}>
+                    {list.coverImageURL ? 'Has cover image' : 'No cover image'}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Library Settings */}
-            {renderLibrarySettings()}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Library Settings</Text>
+              <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Today</Text>
+                <Switch
+                  value={localSettings.today}
+                  onValueChange={(value) => handleSettingChange('today', value)}
+                  trackColor={{ false: colors.backgroundSecondary, true: `${colors.primary}80` }}
+                  thumbColor={localSettings.today ? colors.primary : colors.backgroundTertiary}
+                />
+              </View>
+              <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notify on new</Text>
+                <Switch
+                  value={localSettings.notifyOnNew}
+                  onValueChange={(value) => handleSettingChange('notifyOnNew', value)}
+                  trackColor={{ false: colors.backgroundSecondary, true: `${colors.primary}80` }}
+                  thumbColor={localSettings.notifyOnNew ? colors.primary : colors.backgroundTertiary}
+                />
+              </View>
+              <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Sort Order</Text>
+                <SortOrderDropdown
+                  value={localSettings.sortOrder}
+                  onChange={(value) => handleSettingChange('sortOrder', value)}
+                  isOpen={isSortOrderOpen}
+                  toggleOpen={() => setIsSortOrderOpen(!isSortOrderOpen)}
+                  colors={colors}
+                />
+              </View>
+              {localSettings.notifyOnNew && (
+                <>
+                  <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                    <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notify Time</Text>
+                    <Text style={[styles.settingValue, { color: colors.textSecondary }]}>
+                      {list.notifyTime ? new Date(list.notifyTime).toLocaleTimeString() : 'Not set'}
+                    </Text>
+                  </View>
+                  <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                    <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notify Days</Text>
+                    <Text style={[styles.settingValue, { color: colors.textSecondary }]}>
+                      {list.notifyDays || 'Not set'}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
             
             {/* Remove/Delete Button */}
             <TouchableOpacity

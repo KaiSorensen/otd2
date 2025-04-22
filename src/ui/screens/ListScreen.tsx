@@ -368,9 +368,10 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
       await storeNewList(list, currentUser.id, folderId);
       if (currentUser.id !== list.ownerID) {
         await addItems(items); // if it's not in our library AND the user is not the owner, then we need to download the items
+        console.log("added remote items to library")
       }
-      // Refresh the list to update its library status
-      // await list.refresh();
+      // Refresh the User to update the library UI
+      await currentUser.refresh();
     } catch (error) {
       console.error('Error adding list to library:', error);
       Alert.alert('Error', 'Failed to add list to library. Please try again.');
@@ -396,7 +397,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
             try {
               await removeListFromFolder(currentUser.id, list.folderID, list.id);
               // Refresh the list to update its library status
-              await list.refresh();
+              await currentUser.refresh();
             } catch (error) {
               console.error('Error removing list from library:', error);
               Alert.alert('Error', 'Failed to remove list from library. Please try again.');

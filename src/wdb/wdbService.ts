@@ -89,7 +89,11 @@ export async function storeNewList(list: List, adderID: string, folderID: string
 
   await database.write(async () => {
     await database.get<wLibraryList>('librarylists').create(raw => {
-      raw.id2 = safeUUID();
+      const uuid = safeUUID();
+      if (!uuid) {
+        throw new Error('Failed to generate UUID for library list');
+      }
+      raw.id2 = uuid;
       raw.owner_id = adderID;
       raw.list_id = list.id;
       raw.folder_id = folderID;

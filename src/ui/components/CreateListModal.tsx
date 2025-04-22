@@ -14,7 +14,7 @@ import { useColors } from '../../contexts/ColorContext';
 import { List } from '../../classes/List';
 import { Folder } from '../../classes/Folder';
 import { v4 as uuidv4 } from 'uuid';
-import { storeNewList, addListToFolder } from '../../wdb/wdbService';
+import { storeNewList } from '../../wdb/wdbService';
 import { useAuth } from '../../contexts/UserContext';
 
 interface CreateListModalProps {
@@ -58,7 +58,7 @@ const CreateListModal: React.FC<CreateListModalProps> = ({
     );
 
     try {
-      await storeNewList(newList);
+      await storeNewList(newList, currentUser.id, selectedFolderId);
       onListCreated(newList);
       onClose();
       // Reset form

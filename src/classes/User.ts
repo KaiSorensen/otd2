@@ -86,6 +86,13 @@ export class User {
         this._email = data.email;
         this._avatarURL = data.avatarURL;
         this._notifsEnabled = data.notifsEnabled;
+
+        // Refresh library data
+        this._rootFolders = data.rootFolders;
+        this._listMap = data.listMap;
+        this._todayInfo = new TodayInfo(this.getTodayLists());
+
+        console.log("refreshed user")
     }
 
     public addRootFolder(folder: Folder) {

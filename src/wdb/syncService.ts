@@ -99,10 +99,20 @@ function isoToDate(val: any): Date | null {
   return new Date(val);
 }
 
+// Module-level sync lock
+let isSyncing = false;
+
 export async function syncUserData() {
+  // If already syncing, skip this sync
+  if (isSyncing) {
+    console.log('Sync already in progress, skipping...');
+    return false;
+  }
+
   const logger = {};
   
   try {
+    isSyncing = true;
     await synchronize({
       database,
       pullChanges: async ({ lastPulledAt, schemaVersion, migration }) => {
@@ -146,6 +156,8 @@ export async function syncUserData() {
           // Transform Supabase data to Watermelon format
           data?.forEach(record => {
             const transformedRecord: any = {};
+            // Add the id field that WatermelonDB requires
+            transformedRecord.id = record.id;
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
               let value = record[supabaseField];
               // Convert date fields to Date objects
@@ -255,6 +267,8 @@ export async function syncUserData() {
   } catch (error) {
     console.error('Sync failed:', error);
     return false;
+  } finally {
+    isSyncing = false;
   }
 }
 
@@ -272,6 +286,9 @@ export function setupSyncOnChanges() {
   const changes = database.withChangesForTables(tables);
   
   changes.subscribe(() => {
+    // Don't schedule a new sync if one is already in progress
+    if (isSyncing) return;
+    
     // Debounce sync calls to avoid too frequent syncing
     if (syncTimeout) {
       clearTimeout(syncTimeout);
@@ -279,12 +296,14 @@ export function setupSyncOnChanges() {
     
     syncTimeout = setTimeout(() => {
       syncUserData();
-    }, 5000); // Wait 5 seconds after last change before syncing
+    }, 10000); // Increased debounce time to 10 seconds
   });
 }
 
 // Initialize sync when app starts
 export async function initializeSync() {
+  let syncTimeout: NodeJS.Timeout | null = null;
+  
   // Set up change listeners
   setupSyncOnChanges();
   
@@ -299,9 +318,14 @@ export async function initializeSync() {
         event: '*', 
         schema: 'public'
       }, 
-      () => {
-        // When remote changes are detected, trigger sync
-        syncUserData();
+      async () => {
+        // Debounce remote changes to avoid rapid resyncs
+        if (syncTimeout) {
+          clearTimeout(syncTimeout);
+        }
+        syncTimeout = setTimeout(() => {
+          syncUserData();
+        }, 5000);
       }
     )
     .subscribe();
