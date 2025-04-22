@@ -370,7 +370,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
         await addItems(items); // if it's not in our library AND the user is not the owner, then we need to download the items
       }
       // Refresh the list to update its library status
-      await list.refresh();
+      // await list.refresh();
     } catch (error) {
       console.error('Error adding list to library:', error);
       Alert.alert('Error', 'Failed to add list to library. Please try again.');

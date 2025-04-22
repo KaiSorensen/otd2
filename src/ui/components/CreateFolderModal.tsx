@@ -43,8 +43,6 @@ const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
       currentUser.id,
       selectedParentId || null,
       folderName.trim(),
-      new Date(),
-      new Date()
     );
 
     try {

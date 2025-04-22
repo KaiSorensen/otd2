@@ -1,7 +1,7 @@
 import { synchronize } from '@nozbe/watermelondb/sync';
 import { database } from '.';
-import { User } from '../classes';
 import { supabase } from '../supabase/supabase';
+import { User as wUser } from './models';
 
 // Define the shape of the sync response
 interface SyncResponse {
@@ -112,10 +112,24 @@ export async function syncUserData() {
 
         // For each table, fetch changes from Supabase
         for (const [watermelonTable, supabaseTable] of Object.entries(tableNameMap)) {
-          const { data, error } = await supabase
+          let query = supabase
             .from(supabaseTable.toLowerCase())
             .select('*')
             .gt('updatedat', new Date(lastPulledAt || 0).toISOString());
+
+          // Only pull the current user's data for users table
+          if (watermelonTable === 'users') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+              console.log("user sessoin id: ", session.user.id)
+              query = query.eq('id', session.user.id);
+            } else {
+              // If no session, skip users table entirely
+              continue;
+            }
+          }
+
+          const { data, error } = await query;
 
           if (error) throw error;
 
@@ -164,7 +178,7 @@ export async function syncUserData() {
           const supabaseTable = tableNameMap[watermelonTable];
           
           // Handle created and updated records
-          const recordsToUpsert = [
+          let recordsToUpsert = [
             ...tableChanges.created,
             ...tableChanges.updated
           ].map(record => {
@@ -184,6 +198,31 @@ export async function syncUserData() {
             console.log(`[syncService] Prepared record to upsert for ${supabaseTable}:`, transformedRecord);
             return transformedRecord;
           });
+
+          // Filter out lists that don't belong to the current user
+          if (watermelonTable === 'lists') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+              recordsToUpsert = recordsToUpsert.filter(record => record.ownerid === session.user.id);
+            }
+          }
+
+          // Filter out items that don't belong to lists owned by the current user
+          if (watermelonTable === 'items') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+              // Get all lists owned by the current user
+              const { data: userLists } = await supabase
+                .from('lists')
+                .select('id')
+                .eq('ownerid', session.user.id);
+              
+              if (userLists) {
+                const userListIds = userLists.map(list => list.id);
+                recordsToUpsert = recordsToUpsert.filter(record => userListIds.includes(record.listid));
+              }
+            }
+          }
 
           console.log(`[syncService] All records to upsert for ${supabaseTable}:`, recordsToUpsert);
 

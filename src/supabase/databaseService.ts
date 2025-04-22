@@ -9,20 +9,7 @@ import { supabase } from './supabase';
 
 // the file currently disregards isInternetReachable
 
-export async function getItemsInList(listID: string): Promise<Item[]> {
-  const { data, error } = await supabase.from('items').select('*').eq('listid', listID);
-  if (error) {
-    throw error;
-  }
-  return data.map((item) => new Item(
-    item.id,
-    item.listid,
-    item.title || '',
-    item.content || '',
-    item.imageurls || [],
-    item.orderindex || 0
-  ));
-}
+
 
 export async function retrieveUser(userId: string): Promise<User | null> {
   try {
@@ -47,6 +34,13 @@ export async function retrieveUser(userId: string): Promise<User | null> {
   } catch (error) {
     console.error('Unexpected error in retrieveUser:', error);
     return null;
+  }
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  const { error } = await supabase.from('users').delete().eq('id', userId);
+  if (error) {
+    throw error;
   }
 }
 
@@ -153,3 +147,17 @@ export async function getPublicListsByUser(userId: string, isInternetReachable: 
   }
 }
 
+export async function getItemsInList(listID: string): Promise<Item[]> {
+  const { data, error } = await supabase.from('items').select('*').eq('listid', listID);
+  if (error) {
+    throw error;
+  }
+  return data.map((item) => new Item(
+    item.id,
+    item.listid,
+    item.title || '',
+    item.content || '',
+    item.imageurls || [],
+    item.orderindex || 0
+  ));
+}
