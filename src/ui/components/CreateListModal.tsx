@@ -37,7 +37,7 @@ const CreateListModal: React.FC<CreateListModalProps> = ({
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
 
   const handleCreate = async () => {
-    if (!listName.trim() || !currentUser) return;
+    if (!listName.trim() || !currentUser || !selectedFolderId) return;
 
     const newList = new List(
       uuidv4(),
