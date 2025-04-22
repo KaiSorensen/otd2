@@ -422,8 +422,12 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
           onPress: async () => {
             try {
               await removeListFromFolder(currentUser.id, list.folderID, list.id);
+              // Remove the list from the user's memory state
+              currentUser.removeList(list);
               // Refresh the list to update its library status
               await currentUser.refresh();
+              // Update the local list state to reflect it's no longer in the library
+              setList(initialList);
             } catch (error) {
               console.error('Error removing list from library:', error);
               Alert.alert('Error', 'Failed to remove list from library. Please try again.');

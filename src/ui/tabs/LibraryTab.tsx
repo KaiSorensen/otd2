@@ -51,6 +51,16 @@ const LibraryScreen = () => {
     }
   }, [currentUser]);
 
+  // Add useEffect to refresh selectedList when currentUser changes
+  useEffect(() => {
+    if (selectedList && currentUser) {
+      const updatedList = currentUser.listMap.get(selectedList.id);
+      if (!updatedList) {
+        setSelectedList(null);
+      }
+    }
+  }, [currentUser, selectedList]);
+
   const toggleFolder = (folderId: string) => {
     const newExpandedFolders = new Set(expandedFolders);
     if (newExpandedFolders.has(folderId)) {
