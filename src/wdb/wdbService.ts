@@ -71,14 +71,12 @@ export async function storeNewFolder(folder: Folder) {
   await syncUserData();
 }
 
-export async function storeNewList(list: List) {
-  console.log('[storeNewList] Incoming list.id:', list.id);
-
-  const idToUse = list.id || safeUUID();
+export async function storeNewList(list: List, adderID: string, folderID: string) {
+  console.log('[storeNewList] Incoming list:', list.id);
 
   await database.write(async () => {
     await database.get<wList>('lists').create(raw => {
-      raw.id2 = idToUse;
+      raw.id2 = list.id;
       raw.owner_id = list.ownerID;
       raw.title = list.title;
       raw.description = list.description;
@@ -92,9 +90,9 @@ export async function storeNewList(list: List) {
   await database.write(async () => {
     await database.get<wLibraryList>('librarylists').create(raw => {
       raw.id2 = safeUUID();
-      raw.owner_id = list.ownerID;
-      raw.list_id = idToUse;
-      raw.folder_id = list.folderID;
+      raw.owner_id = adderID;
+      raw.list_id = list.id;
+      raw.folder_id = folderID;
       raw.sort_order = list.sortOrder;
       raw.today = list.today;
       raw.current_item = list.currentItem;
@@ -704,6 +702,13 @@ export async function deleteList(listId: string): Promise<void> {
     }
     await list[0].destroyPermanently();
   });
+  // remove items of list from library
+  await database.write(async () => {
+    const libraryList = await database.get<wLibraryList>('librarylists').query(Q.where('list_id', listId)).fetch();
+    if (libraryList.length) {
+      await libraryList[0].destroyPermanently();
+    }
+  });
   // Sync after list deletion
   await syncUserData();
 }
@@ -732,24 +737,20 @@ interface LibraryConfig {
   orderIndex?: number;
 }
 
-export async function addListToFolder(ownerID: string, folderID: string, listID: string, config?: LibraryConfig) {
+export async function addItems(items: Item[]) {
   await database.write(async () => {
-    await database.get<wLibraryList>('librarylists').create((raw: wLibraryList) => {
-      raw.owner_id = ownerID;
-      raw.folder_id = folderID;
-      raw.list_id = listID;
-      raw.sort_order = config?.sortOrder || 'date-first';
-      raw.today = config?.today || false;
-      raw.current_item = config?.currentItem || null;
-      raw.notify_on_new = config?.notifyOnNew || false;
-      raw.notify_time = config?.notifyTime || null;
-      raw.notify_days = config?.notifyDays || null;
-      raw.order_index = config?.orderIndex || 0;
-      raw.created_at = new Date();
-      raw.updated_at = new Date();
-    });
+    for (const item of items) {
+      await database.get<wItem>('items').create(raw => {
+        raw.id2 = item.id;
+        raw.list_id = item.listID;
+        raw.title = item.title ?? '';
+        raw.content = item.content ?? '';
+        raw.image_urls = item.imageURLs ?? [];
+        raw.order_index = item.orderIndex;
+      });
+    }
   });
-  // Sync after adding list to folder
+  // Sync after adding items
   await syncUserData();
 }
 
@@ -771,7 +772,7 @@ export async function removeListFromFolder(ownerID: string, folderID: string, li
   await syncUserData();
 }
 
-export async function moveListToFolder(ownerID: string, oldFolderID: string, newFolderID: string, listID: string) {
+export async function switchFolderOfList(ownerID: string, oldFolderID: string, newFolderID: string, listID: string) {
   await database.write(async () => {
     const libraryList = await database.get<wLibraryList>('librarylists')
       .query(
@@ -801,8 +802,7 @@ export async function moveListToFolder(ownerID: string, oldFolderID: string, new
         raw.updated_at = new Date();
       });
     } else {
-      // If no old config found, add with default settings
-      await addListToFolder(ownerID, newFolderID, listID);
+      console.log('[switchFolderOfList] List not found in library');
     }
   });
   // Sync after moving list to folder

@@ -7,11 +7,54 @@ import { supabase } from './supabase';
 // import { useNetwork } from '../contexts/NetworkContext';
 // import { v4 as uuidv4 } from 'uuid';
 
+// the file currently disregards isInternetReachable
+
+export async function getItemsInList(listID: string): Promise<Item[]> {
+  const { data, error } = await supabase.from('items').select('*').eq('listid', listID);
+  if (error) {
+    throw error;
+  }
+  return data.map((item) => new Item(
+    item.id,
+    item.listid,
+    item.title || '',
+    item.content || '',
+    item.imageurls || [],
+    item.orderindex || 0
+  ));
+}
+
+export async function retrieveUser(userId: string): Promise<User | null> {
+  try {
+    const { data, error } = await supabase.from('users').select('*').eq('id', userId).single();
+    if (error) {
+      console.error('Error retrieving user from database:', error);
+      return null;
+    }
+    if (data === null) {
+      console.log('User not found in database:', userId);
+      return null;
+    }
+    const user = new User(
+      data.id, 
+      data.username, 
+      data.email, 
+      data.avatarurl, 
+      data.notifsenabled
+    );
+    
+    return user;
+  } catch (error) {
+    console.error('Unexpected error in retrieveUser:', error);
+    return null;
+  }
+}
+
 
 // ======= SEARCH FUNCTIONS =======
 
 export async function getUsersBySubstring(substring: string, isInternetReachable: boolean): Promise<User[]> {
-  if (!isInternetReachable) return [];
+  // if (!isInternetReachable) return [];
 
   const { data, error } = await supabase.from('users').select('*').ilike('username', `%${substring}%`);
   if (error) {
@@ -34,7 +77,8 @@ export async function getUsersBySubstring(substring: string, isInternetReachable
  */
 export async function getPublicListsBySubstring(substring: string, isInternetReachable: boolean): Promise<List[]> {
   console.log('getting public lists by substring', substring);
-  if (!isInternetReachable) return [];
+  // if (!isInternetReachable) return [];
+  console.log('isInternetReachable', isInternetReachable);
 
   const { data, error } = await supabase
     .from('lists')
@@ -70,7 +114,7 @@ export async function getPublicListsBySubstring(substring: string, isInternetRea
  * Get all public lists for a specific user
  */
 export async function getPublicListsByUser(userId: string, isInternetReachable: boolean, viewerUserId?: string): Promise<List[]> {
-  if (!isInternetReachable) return [];
+  // if (!isInternetReachable) return [];
 
   try {
     const { data, error } = await supabase

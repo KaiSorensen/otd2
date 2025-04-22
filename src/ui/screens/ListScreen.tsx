@@ -3,9 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
-  Switch,
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
@@ -20,8 +18,9 @@ import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { User } from '../../classes/User';
 import { Folder } from '../../classes/Folder';
-import { getItemsInList, retrievePopulatedUser, storeNewItem, deleteItem, addListToFolder, removeListFromFolder, deleteList } from '../../wdb/wdbService';
-import ListImage from '../components/ListImage';
+import { addItems, switchFolderOfList, storeNewItem, deleteItem, storeNewList, removeListFromFolder, deleteList, getItemsInList as local_getItemsInList } from '../../wdb/wdbService';
+import { getItemsInList as remote_getItemsInList, retrieveUser } from '../../supabase/databaseService';
+// import ListImage from '../components/ListImage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../contexts/UserContext';
 import { useColors } from '../../contexts/ColorContext';
@@ -29,7 +28,11 @@ import ItemScreen from './ItemScreen';
 import UserScreen from './UserScreen';
 import ListSettingsModal from '../components/ListSettingsModal';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../../supabase/supabase';
+
+
+// TODO:
+// - switch folder of list should work
+// - add list to folder should work
 
 // Helper function to strip HTML tags for plain text display
 const stripHtml = (html: string): string => {
@@ -120,6 +123,7 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
   const { colors } = useColors();
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+  const [loadingFolders, setLoadingFolders] = useState(false);
 
   return (
     <Modal
@@ -140,54 +144,60 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
           <View style={styles.modalBody}>
             <View style={[styles.inputContainer, { borderBottomColor: colors.divider }]}>
               <Text style={[styles.label, { color: colors.textPrimary }]}>Select Folder</Text>
-              <TouchableOpacity
-                style={[styles.dropdownButton, { backgroundColor: colors.backgroundSecondary }]}
-                onPress={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
-              >
-                <Text style={[styles.dropdownButtonText, { color: colors.textPrimary }]}>
-                  {selectedFolderId ? 
-                    folders.find(f => f.id === selectedFolderId)?.name || 'Unknown' : 
-                    'Select a folder'}
-                </Text>
-                <Icon
-                  name={isFolderDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                  size={24}
-                  color={colors.iconSecondary}
-                />
-              </TouchableOpacity>
-              
-              {isFolderDropdownOpen && (
-                <View style={[styles.dropdownContent, { backgroundColor: colors.backgroundSecondary }]}>
-                  {folders.map(folder => (
-                    <TouchableOpacity
-                      key={folder.id}
-                      style={[styles.dropdownItem, { borderBottomColor: colors.divider }]}
-                      onPress={() => {
-                        setSelectedFolderId(folder.id);
-                        setIsFolderDropdownOpen(false);
-                      }}
-                    >
-                      <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>
-                        {folder.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              {loadingFolders ? (
+                <ActivityIndicator size="small" color={colors.primary} style={styles.folderLoader} />
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.dropdownButton, { backgroundColor: colors.backgroundSecondary }]}
+                    onPress={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                  >
+                    <Text style={[styles.dropdownButtonText, { color: colors.textPrimary }]}>
+                      {selectedFolderId ? 
+                        folders.find(f => f.id === selectedFolderId)?.name || 'Unknown' : 
+                        'Select a folder'}
+                    </Text>
+                    <Icon
+                      name={isFolderDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                      size={24}
+                      color={colors.iconSecondary}
+                    />
+                  </TouchableOpacity>
+                  
+                  {isFolderDropdownOpen && (
+                    <View style={[styles.dropdownContent, { backgroundColor: colors.backgroundSecondary }]}>
+                      {folders.map(folder => (
+                        <TouchableOpacity
+                          key={folder.id}
+                          style={[styles.dropdownItem, { borderBottomColor: colors.divider }]}
+                          onPress={() => {
+                            setSelectedFolderId(folder.id);
+                            setIsFolderDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>
+                            {folder.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
               )}
             </View>
 
             <TouchableOpacity
               style={[
                 styles.addButton,
-                { backgroundColor: colors.primary }
+                { backgroundColor: colors.primary, opacity: !selectedFolderId || loadingFolders ? 0.5 : 1 }
               ]}
               onPress={() => {
-                if (selectedFolderId) {
+                if (selectedFolderId && !loadingFolders) {
                   onAdd(selectedFolderId);
                   onClose();
                 }
               }}
-              disabled={!selectedFolderId}
+              disabled={!selectedFolderId || loadingFolders}
             >
               <Text style={styles.addButtonText}>Add to Library</Text>
             </TouchableOpacity>
@@ -202,15 +212,16 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
   const { currentUser } = useAuth();
   const { colors, isDarkMode } = useColors();
   const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isSortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [listOwner, setListOwner] = useState<User | null>(null);
   const [showingUserScreen, setShowingUserScreen] = useState(false);
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddToLibraryModalVisible, setIsAddToLibraryModalVisible] = useState(false);
   const [userFolders, setUserFolders] = useState<Folder[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [listOwner, setListOwner] = useState<User | null>(null);
   
   // Local state for list properties that can be modified
   const [isToday, setIsToday] = useState(list.today || false);
@@ -219,18 +230,33 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
   const [sortOrder, setSortOrder] = useState<SortOrderType>(list.sortOrder as SortOrderType || 'date-first');
   const [isSortOrderOpen, setIsSortOrderOpen] = useState(false);
 
-  // Add useEffect to fetch items when component mounts
+  // Add useEffect to fetch items and owner when component mounts
   useEffect(() => {
     fetchItems();
-    fetchListOwner();
+    fetchOwner();
   }, []);
+
+  // Add useEffect to fetch folders when modal is opened
+  useEffect(() => {
+    if (isAddToLibraryModalVisible && currentUser) {
+      fetchUserFolders();
+    }
+  }, [isAddToLibraryModalVisible, currentUser]);
 
   // Function to fetch items
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const listItems = await getItemsInList(list.id);
-      setItems(listItems);
+      // if the list is in our library, then we need to fetch the items from the library
+      if (currentUser?.listMap.has(list.id)) {
+        const listItems = await local_getItemsInList(list.id);
+        setItems(listItems);
+      } else {
+        // if the list is not in our library, then we need to fetch the items from the remote database
+        const listItems = await remote_getItemsInList(list.id);
+        setItems(listItems);
+      }
+      
     } catch (error) {
       console.error('Error fetching items:', error);
     } finally {
@@ -238,17 +264,24 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
     }
   };
 
-  const fetchListOwner = async () => {
+  // Function to fetch user's folders
+  const fetchUserFolders = async () => {
+    if (!currentUser) return;
+    
+    setLoadingFolders(true);
     try {
-      if (list.ownerID) {
-        const ownerData = await retrievePopulatedUser(list.ownerID);
-        if (ownerData) {
-          setListOwner(ownerData);
-        }
-      }
+      // First get the populated user to ensure we have the latest folder data
+      setUserFolders(currentUser.getAllFolders());
     } catch (error) {
-      console.error('Error fetching list owner:', error);
+      console.error('Error fetching user folders:', error);
+    } finally {
+      setLoadingFolders(false);
     }
+  };
+
+  const fetchOwner = async () => {
+    const owner = await retrieveUser(list.ownerID);
+    setListOwner(owner);
   };
 
   // Handle settings save
@@ -332,7 +365,10 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
     if (!currentUser) return;
     
     try {
-      await addListToFolder(currentUser.id, folderId, list.id);
+      await storeNewList(list, currentUser.id, folderId);
+      if (currentUser.id !== list.ownerID) {
+        await addItems(items); // if it's not in our library AND the user is not the owner, then we need to download the items
+      }
       // Refresh the list to update its library status
       await list.refresh();
     } catch (error) {
@@ -435,8 +471,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list, onBack }) => {
   const headerHeight = Math.min(height * 0.4, 300);
 
   // If showing user screen
-  if (showingUserScreen && listOwner) {
-    return <UserScreen user={listOwner} onBack={() => setShowingUserScreen(false)} />;
+  if (showingUserScreen) {
+    return <UserScreen userID={list.ownerID} onBack={() => setShowingUserScreen(false)} />;
   }
 
   // If an item is selected, show the ItemScreen
@@ -846,6 +882,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  folderLoader: {
+    marginVertical: 16,
   },
 });
 

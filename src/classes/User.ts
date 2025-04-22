@@ -1,4 +1,4 @@
-import { retrievePopulatedUser, updateUser, moveListToFolder } from '../wdb/wdbService';
+import { retrievePopulatedUser, updateUser, switchFolderOfList } from '../wdb/wdbService';
 import { Folder } from './Folder';
 import { List } from './List';
 import { TodayInfo } from './TodayInfo';
@@ -161,11 +161,15 @@ export class User {
         return Array.from(this._listMap.values()).filter(l => l.today);
     }
 
+    public getPublicLists() {
+        return Array.from(this._listMap.values()).filter(l => l.isPublic);
+    }
+
     public refreshTodayLists() {
         this._todayInfo.updateTodayLists(this.getTodayLists());
     }
 
-    public async moveListToFolder(list: List, newFolderId: string) {
+    public async switchFolderOfList(list: List, newFolderId: string) {
         if (!list.currentUserID) {
             throw new Error('List is not in any user\'s library');
         }
@@ -184,7 +188,7 @@ export class User {
             (list as any)._folderID = newFolderId;
             
             // Update the database
-            await moveListToFolder(list.currentUserID, list.folderID, newFolderId, list.id);
+            await switchFolderOfList(list.currentUserID, list.folderID, newFolderId, list.id);
         } else {
             throw new Error('New folder not found');
         }

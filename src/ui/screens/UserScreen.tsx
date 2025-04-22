@@ -8,36 +8,43 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  Dimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { User } from '../../classes/User';
 import { List } from '../../classes/List';
-import { supabase } from '../../supabase/supabase';
 import ListScreen from './ListScreen';
 import ListPreview from '../components/ListPreview';
 import { useColors } from '../../contexts/ColorContext';
-import { getPublicListsByUser } from '../../wdb/wdbService';
+import { retrieveUser, getPublicListsByUser as remote_getPublicListsByUser } from '../../supabase/databaseService';
+import { useNetwork } from '../../contexts/NetworkContext';
 
 interface UserScreenProps {
-  user: User;
+  userID: string;
   onBack?: () => void;
 }
 
-const UserScreen: React.FC<UserScreenProps> = ({ user, onBack }) => {
+const UserScreen: React.FC<UserScreenProps> = ({ userID, onBack }) => {
   const { colors } = useColors();
   const [publicLists, setPublicLists] = useState<List[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedList, setSelectedList] = useState<List | null>(null);
+  const { isInternetReachable } = useNetwork();
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
+    fetchUser();
     fetchPublicLists();
   }, []);
+
+  const fetchUser = async () => {
+    const owner = await retrieveUser(userID);
+    setUser(owner);
+  };
 
   const fetchPublicLists = async () => {
     setLoading(true);
     try {
-      const lists = await getPublicListsByUser(user.id, user.id);
+      const lists = await remote_getPublicListsByUser(userID, isInternetReachable);
       setPublicLists(lists);
     } catch (error) {
       console.error('Error fetching public lists:', error);
@@ -75,17 +82,17 @@ const UserScreen: React.FC<UserScreenProps> = ({ user, onBack }) => {
       {/* User Profile Section */}
       <View style={[styles.profileSection, { borderBottomColor: colors.divider }]}>
         <View style={styles.avatarContainer}>
-          {user.avatarURL ? (
+          {user?.avatarURL ? (
             <Image source={{ uri: user.avatarURL }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatarPlaceholder, { backgroundColor: colors.backgroundSecondary }]}>
               <Text style={[styles.avatarText, { color: colors.textSecondary }]}>
-                {user.username.charAt(0).toUpperCase()}
+                {user?.username.charAt(0).toUpperCase()}
               </Text>
             </View>
           )}
         </View>
-        <Text style={[styles.username, { color: colors.textPrimary }]}>{user.username}</Text>
+        <Text style={[styles.username, { color: colors.textPrimary }]}>{user?.username}</Text>
       </View>
 
       {/* Public Lists Section */}
