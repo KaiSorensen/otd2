@@ -681,7 +681,7 @@ export async function deleteUser(userId: string): Promise<void> {
     if (!user || user.length === 0) {
       throw new Error('User not found');
     }
-    await user[0].destroyPermanently();
+    await user[0].markAsDeleted();
   });
   // Sync after user deletion
   await syncUserData();
@@ -693,7 +693,13 @@ export async function deleteFolder(folderId: string): Promise<void> {
     if (!folder || folder.length === 0) {
       throw new Error('Folder not found');
     }
-    await folder[0].destroyPermanently();
+    // Store the id2 value before marking as deleted
+    const id2 = folder[0].id2;
+    await folder[0].markAsDeleted();
+    // Add the id2 to the deleted array in the changes object
+    (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
+    (database as any).adapter.deletedRecords.folders = (database as any).adapter.deletedRecords.folders || [];
+    (database as any).adapter.deletedRecords.folders.push(id2);
   });
   // Sync after folder deletion
   await syncUserData();
@@ -702,30 +708,38 @@ export async function deleteFolder(folderId: string): Promise<void> {
 export async function deleteList(listId: string): Promise<void> {
   console.log('[deleteList] Starting to delete list:', listId);
   
-    // First delete from librarylists
-    console.log('[deleteList] Removing list config from library');
+  // First delete from librarylists
+  console.log('[deleteList] Removing list config from library');
   await database.write(async () => {
     const libraryList = await database.get<wLibraryList>('librarylists').query(Q.where('list_id', listId)).fetch();
     if (libraryList.length) {
-      await libraryList[0].destroyPermanently();
+      const id2 = libraryList[0].id2;
+      await libraryList[0].markAsDeleted();
+      // Add the id2 to the deleted array in the changes object
+      (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
+      (database as any).adapter.deletedRecords.librarylists = (database as any).adapter.deletedRecords.librarylists || [];
+      (database as any).adapter.deletedRecords.librarylists.push(id2);
     }
   });
-  
 
   try {
-
-  // Then delete from lists table
-  console.log('[deleteList] Removing list from lists table');
-  await database.write(async () => {
-    const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
-    if (!list || list.length === 0) {
-      throw new Error('List not found in lists table');
-    }
-    await list[0].destroyPermanently();
-  });
-} catch (error) {
-  console.log('[deleteList] list was ALREADY GONE. WHERE DID IT GO..??:');
-}
+    // Then delete from lists table
+    console.log('[deleteList] Removing list from lists table');
+    await database.write(async () => {
+      const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
+      if (!list || list.length === 0) {
+        throw new Error('List not found in lists table');
+      }
+      const id2 = list[0].id2;
+      await list[0].markAsDeleted();
+      // Add the id2 to the deleted array in the changes object
+      (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
+      (database as any).adapter.deletedRecords.lists = (database as any).adapter.deletedRecords.lists || [];
+      (database as any).adapter.deletedRecords.lists.push(id2);
+    });
+  } catch (error) {
+    console.log('[deleteList] list was ALREADY GONE. WHERE DID IT GO..??:');
+  }
 
   // Finally remove items belonging to list from library
   console.log('[deleteList] Removing items from library');
@@ -733,7 +747,12 @@ export async function deleteList(listId: string): Promise<void> {
     const items = await database.get<wItem>('items').query(Q.where('list_id', listId)).fetch();
     if (items.length) {
       for (const item of items) {
-        await item.destroyPermanently();
+        const id2 = item.id2;
+        await item.markAsDeleted();
+        // Add the id2 to the deleted array in the changes object
+        (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
+        (database as any).adapter.deletedRecords.items = (database as any).adapter.deletedRecords.items || [];
+        (database as any).adapter.deletedRecords.items.push(id2);
       }
     }
   });
@@ -748,7 +767,12 @@ export async function deleteItem(itemId: string): Promise<void> {
     if (!item || item.length === 0) {
       throw new Error('Item not found');
     }
-    await item[0].destroyPermanently();
+    const id2 = item[0].id2;
+    await item[0].markAsDeleted();
+    // Add the id2 to the deleted array in the changes object
+    (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
+    (database as any).adapter.deletedRecords.items = (database as any).adapter.deletedRecords.items || [];
+    (database as any).adapter.deletedRecords.items.push(id2);
   });
   // Sync after item deletion
   await syncUserData();
@@ -796,7 +820,7 @@ export async function switchFolderOfList(ownerID: string, oldFolderID: string, n
     if (libraryList.length) {
       const oldConfig = libraryList[0];
       const oldCreatedAt = oldConfig.created_at || new Date();
-      await oldConfig.destroyPermanently();
+      await oldConfig.markAsDeleted();
 
       await database.get<wLibraryList>('librarylists').create(raw => {
         raw.owner_id = ownerID;
@@ -824,36 +848,8 @@ export async function switchFolderOfList(ownerID: string, oldFolderID: string, n
 
 export async function deleteAllData(): Promise<void> {
   await database.write(async () => {
-    // Delete all library lists first (due to foreign key constraints)
-    const libraryLists = await database.get<wLibraryList>('librarylists').query().fetch();
-    for (const libraryList of libraryLists) {
-      await libraryList.destroyPermanently();
-    }
-
-    // Delete all items
-    const items = await database.get<wItem>('items').query().fetch();
-    for (const item of items) {
-      await item.destroyPermanently();
-    }
-
-    // Delete all lists
-    const lists = await database.get<wList>('lists').query().fetch();
-    for (const list of lists) {
-      await list.destroyPermanently();
-    }
-
-    // Delete all folders
-    const folders = await database.get<wFolder>('folders').query().fetch();
-    for (const folder of folders) {
-      await folder.destroyPermanently();
-    }
-
-    // Delete all users
-    const users = await database.get<wUser>('users').query().fetch();
-    for (const user of users) {
-      await user.destroyPermanently();
-    }
-
+    // Use unsafeResetDatabase to truly drop all data without emitting delete events
+    await database.adapter.unsafeResetDatabase();
     console.log('All wdb data deleted.');
   });
   // No need to sync after deleting all data

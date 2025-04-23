@@ -1,7 +1,7 @@
 import { synchronize } from '@nozbe/watermelondb/sync';
 import { database } from '.';
 import { supabase } from '../supabase/supabase';
-import { User as wUser } from './models';
+import { Q } from '@nozbe/watermelondb';
 
 // Define the shape of the sync response
 interface SyncResponse {
@@ -139,6 +139,17 @@ export async function syncUserData() {
             }
           }
 
+          // For folders table, only pull folders owned by the current user
+          if (watermelonTable === 'folders') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+              query = query.eq('ownerid', session.user.id);
+            } else {
+              // If no session, skip folders table entirely
+              continue;
+            }
+          }
+
           // For lists table, only pull lists that are in the user's library
           if (watermelonTable === 'lists') {
             const { data: { session } } = await supabase.auth.getSession();
@@ -158,6 +169,17 @@ export async function syncUserData() {
               }
             } else {
               // If no session, skip lists table entirely
+              continue;
+            }
+          }
+
+          // For librarylists table, only pull entries for the current user
+          if (watermelonTable === 'librarylists') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+              query = query.eq('ownerid', session.user.id);
+            } else {
+              // If no session, skip librarylists table entirely
               continue;
             }
           }
@@ -184,6 +206,7 @@ export async function syncUserData() {
               continue;
             }
           }
+          
 
           const { data, error } = await query;
 
@@ -234,6 +257,12 @@ export async function syncUserData() {
         // For each table with changes, push to Supabase
         for (const [watermelonTable, tableChanges] of Object.entries(changes)) {
           const supabaseTable = tableNameMap[watermelonTable];
+          
+          // // Skip user deletions entirely
+          // if (watermelonTable === 'users' && tableChanges.deleted.length > 0) {
+          //   console.log('[syncService] Skipping user deletions for security');
+          //   continue;
+          // }
           
           // Handle created and updated records
           let recordsToUpsert = [
@@ -295,12 +324,84 @@ export async function syncUserData() {
           // Handle deleted records
           if (tableChanges.deleted.length > 0) {
             console.log(`[syncService] Deleting records from ${supabaseTable}:`, tableChanges.deleted);
-            const { error } = await supabase
-              .from(supabaseTable)
-              .delete()
-              .in('id', tableChanges.deleted);
+            
+            // Get the stored id2 values for the deleted records
+            let storedDeletions: string[] = (database as any).adapter.deletedRecords?.[watermelonTable] || [];
+            console.log(`[syncService] Stored deletions for ${watermelonTable}:`, storedDeletions);
+            
+            if (storedDeletions.length > 0) {
+              // Skip user deletions entirely
+              if (watermelonTable === 'users') {
+                console.log('[syncService] Skipping user deletions for security');
+                return;
+              }
 
-            if (error) throw error;
+              // For lists, only allow deletion of lists owned by the current user
+              if (watermelonTable === 'lists') {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user?.id) {
+                  const { data: userLists } = await supabase
+                    .from('lists')
+                    .select('id')
+                    .eq('ownerid', session.user.id)
+                    .in('id', storedDeletions);
+                  
+                  if (userLists) {
+                    const userListIds = userLists.map(list => list.id);
+                    storedDeletions = storedDeletions.filter(id => userListIds.includes(id));
+                  } else {
+                    storedDeletions = [];
+                  }
+                } else {
+                  storedDeletions = [];
+                }
+              }
+
+              // For items, only allow deletion of items belonging to lists owned by the current user
+              if (watermelonTable === 'items') {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user?.id) {
+                  // Get all lists owned by the current user
+                  const { data: userLists } = await supabase
+                    .from('lists')
+                    .select('id')
+                    .eq('ownerid', session.user.id);
+                  
+                  if (userLists) {
+                    const userListIds = userLists.map(list => list.id);
+                    // Get items that belong to user's lists
+                    const { data: userItems } = await supabase
+                      .from('items')
+                      .select('id')
+                      .in('listid', userListIds)
+                      .in('id', storedDeletions);
+                    
+                    if (userItems) {
+                      const userItemIds = userItems.map(item => item.id);
+                      storedDeletions = storedDeletions.filter(id => userItemIds.includes(id));
+                    } else {
+                      storedDeletions = [];
+                    }
+                  } else {
+                    storedDeletions = [];
+                  }
+                } else {
+                  storedDeletions = [];
+                }
+              }
+
+              if (storedDeletions.length > 0) {
+                const { error } = await supabase
+                  .from(supabaseTable)
+                  .delete()
+                  .in('id', storedDeletions);
+
+                if (error) throw error;
+                
+                // Clear the stored deletions after successful sync
+                (database as any).adapter.deletedRecords[watermelonTable] = [];
+              }
+            }
           }
         }
       },
