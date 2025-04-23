@@ -178,6 +178,7 @@ export async function syncUserData() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.id) {
               query = query.eq('ownerid', session.user.id);
+              
             } else {
               // If no session, skip librarylists table entirely
               continue;
@@ -279,6 +280,13 @@ export async function syncUserData() {
               // Convert date fields to ISO strings
               if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
                 value = value ? new Date(value).toISOString() : null;
+              }
+              // Ensure sortorder has a valid value for librarylists
+              if (watermelonTable === 'librarylists' && watermelonField === 'sort_order') {
+                const validSortOrders = ['date-first', 'date-last', 'alphabetical', 'manual'];
+                if (!value || !validSortOrders.includes(value)) {
+                  value = 'date-first'; // Default to date-first if invalid or missing
+                }
               }
               transformedRecord[supabaseField] = value;
             });

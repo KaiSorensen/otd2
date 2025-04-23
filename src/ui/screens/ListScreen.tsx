@@ -271,9 +271,11 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
     try {
       // if the list is in our library, then we need to fetch the items from the library
       if (list.folderID) {
+        console.log("fetching items from library")
         const listItems = await local_getItemsInList(list.id);
         setItems(listItems);
       } else {
+        console.log("fetching items from remote")
         // if the list is not in our library, then we need to fetch the items from the remote database
         const listItems = await remote_getItemsInList(list.id);
         setItems(listItems);
@@ -319,7 +321,9 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       Object.assign(list, updates);
       
       // Save to database
-      await list.save();
+      if (currentUser) {
+        await list.save(currentUser.id);
+      }
     } catch (error) {
       console.error('Error saving list settings:', error);
       // Revert local state if save fails
@@ -341,6 +345,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       '',
       [],
       0,
+      new Date(),
+      new Date()
     );
 
     try {
@@ -648,7 +654,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
         onClose={() => setIsSettingsModalVisible(false)}
         list={list}
         onSave={handleSettingsSave}
-        isOwner={list.isOwner()}
+        isOwner={list.isOwner(currentUser?.id || '')}
         onRemoveFromLibrary={handleRemoveFromLibrary}
         onDeleteList={handleDeleteList}
       />

@@ -6,7 +6,11 @@ export class Item {
     private _title: string | null;
     private _content: string; // This will store HTML content for rich text
     private _imageURLs: string[] | null;
-    private _orderIndex: number | null;
+    private _orderIndex: number;
+
+    // it's relevant to get the timestamps for items since it can be used to sort the items in UI
+    private _createdAt: Date;
+    private _updatedAt: Date;
 
     // Constructor to create an Item instance
     constructor(
@@ -15,7 +19,9 @@ export class Item {
         title: string | null,
         content: string,
         imageURLs: string[] | null,
-        orderIndex: number | null,
+        orderIndex: number,
+        createdAt: Date,
+        updatedAt: Date
     ) {
         this._id = id;
         this._listID = listID;
@@ -23,6 +29,9 @@ export class Item {
         this._content = content || ''; // Ensure content is never null
         this._imageURLs = imageURLs;
         this._orderIndex = orderIndex;
+
+        this._createdAt = createdAt;
+        this._updatedAt = updatedAt;
     }
 
     // Factory method to create an Item instance from database data
@@ -40,6 +49,8 @@ export class Item {
             data.content || '', // Ensure content is never null
             data.imageURLs,
             data.orderIndex,
+            data.createdAt,
+            data.updatedAt
         );
     }
 
@@ -58,8 +69,12 @@ export class Item {
     get imageURLs(): string[] | null { return this._imageURLs; }
     set imageURLs(value: string[] | null) { this._imageURLs = value; }
 
-    get orderIndex(): number | null { return this._orderIndex; }
-    set orderIndex(value: number | null) { this._orderIndex = value; }
+    get orderIndex(): number { return this._orderIndex; }
+    set orderIndex(value: number) { this._orderIndex = value; }
+
+    get createdAt(): Date { return this._createdAt; }
+    get updatedAt(): Date { return this._updatedAt; } 
+    set updatedAt(value: Date) { this._updatedAt = value; }
 
     // Method to save changes to the database
     async save(): Promise<void> {
@@ -71,7 +86,7 @@ export class Item {
             title: this._title,
             content: this._content || '', // Ensure content is never null
             imageURLs: this._imageURLs,
-            orderIndex: this._orderIndex
+            orderIndex: this._orderIndex,
         });
     }
 
@@ -83,6 +98,8 @@ export class Item {
             this._content = data.content || ''; // Ensure content is never null
             this._imageURLs = data.imageURLs;
             this._orderIndex = data.orderIndex;
+            this._createdAt = data.createdAt;
+            this._updatedAt = data.updatedAt;
         }
     }
 }

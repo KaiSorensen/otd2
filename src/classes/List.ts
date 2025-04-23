@@ -12,7 +12,6 @@ export class List {
     private _isPublic: boolean;
     
     // LibraryList specific properties
-    private _currentUserID: string | null; // The ID of the user who added this list to their library
     private _folderID: string;      // The folder this list is in for the current user
     private _sortOrder: SortOrder;
     private _today: boolean;
@@ -22,6 +21,7 @@ export class List {
     private _notifyDays: NotifyDay | null;
     private _orderIndex: number;
 
+
     // Constructor to create a List instance
     constructor(
         id: string,
@@ -30,7 +30,6 @@ export class List {
         description: string | null,
         coverImageURL: string | null,
         isPublic: boolean,
-        currentUserID: string | null = null,
         folderID: string,
         sortOrder: SortOrder = "date-first",
         today: boolean = false,
@@ -48,7 +47,6 @@ export class List {
         this._isPublic = isPublic;
         
         // LibraryList specific properties
-        this._currentUserID = currentUserID;
         this._folderID = folderID;
         this._sortOrder = sortOrder;
         this._today = today;
@@ -62,7 +60,6 @@ export class List {
     // Getters for read-only properties
     get id(): string { return this._id; }
     get ownerID(): string { return this._ownerID; }
-    get currentUserID(): string | null { return this._currentUserID; }
     get folderID(): string { return this._folderID; }
     set folderID(value: string) { this._folderID = value; }
     get orderIndex(): number { return this._orderIndex; }
@@ -100,14 +97,14 @@ export class List {
     set notifyDays(value: NotifyDay | null) { this._notifyDays = value; }
 
     // Check if the current user is the owner of the list
-    isOwner(): boolean {
-        return this._currentUserID !== null && this._currentUserID === this._ownerID;
+    isOwner(currentUserID: string): boolean {
+        return this._ownerID === currentUserID;
     }
 
     // Method to save changes to the database
-    async save(): Promise<void> {
+    async save(userID: string): Promise<void> {
         // If the current user is the owner, they can update the list metadata
-        if (this.isOwner()) {
+        if (this.isOwner(userID)) {
             await updateList(this._id, {
                 title: this._title,
                 description: this._description,
@@ -117,8 +114,8 @@ export class List {
         }
         
         // If the list is in the user's library, update the library configuration
-        if (this._currentUserID && this._folderID) {
-            await updateLibraryListConfig(this._currentUserID, this._folderID, this._id, {
+        if (this._ownerID && this._folderID) {
+            await updateLibraryListConfig(userID, this._folderID, this._id, {
                 sortOrder: this._sortOrder,
                 today: this._today,
                 currentItem: this._currentItem,
@@ -133,7 +130,7 @@ export class List {
     // Method to refresh data from the database
     async refresh(): Promise<void> {
         // Retrieve the list with its library configuration if available
-        const data = await retrieveList(this._currentUserID || this._ownerID, this._id);
+        const data = await retrieveList(this._id);
 
         if (!data) {
             throw new Error('List not found');

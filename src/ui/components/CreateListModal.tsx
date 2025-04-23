@@ -46,7 +46,6 @@ const CreateListModal: React.FC<CreateListModalProps> = ({
       '', // description
       null, // coverImageURL
       false, // isPublic
-      currentUser.id,
       selectedFolderId,
       'date-first', // default sortOrder
       false, // today

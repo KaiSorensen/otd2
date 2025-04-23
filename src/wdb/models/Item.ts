@@ -13,7 +13,7 @@ export default class Item extends Model {
   @field('title') title!: string
   @field('content') content!: string
   @field('image_urls') image_urls!: string[]
-  @field('order_index') order_index!: number | null
+  @field('order_index') order_index!: number
   @date('created_at') created_at!: Date
   @date('updated_at') updated_at!: Date
 
