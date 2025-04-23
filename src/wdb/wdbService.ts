@@ -210,8 +210,9 @@ export async function retrieveList(userID: string, listId: string): Promise<List
       )
       .fetch();
 
-    if (libraryList.length != 0) {
+    if (libraryList.length === 0) {
       console.error('Library list not found');
+      return null;
     }
 
     const liblist = new List(
@@ -699,20 +700,44 @@ export async function deleteFolder(folderId: string): Promise<void> {
 }
 
 export async function deleteList(listId: string): Promise<void> {
-  await database.write(async () => {
-    const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
-    if (!list || list.length === 0) {
-      throw new Error('List not found');
-    }
-    await list[0].destroyPermanently();
-  });
-  // remove items of list from library
+  console.log('[deleteList] Starting to delete list:', listId);
+  
+    // First delete from librarylists
+    console.log('[deleteList] Removing list config from library');
   await database.write(async () => {
     const libraryList = await database.get<wLibraryList>('librarylists').query(Q.where('list_id', listId)).fetch();
     if (libraryList.length) {
       await libraryList[0].destroyPermanently();
     }
   });
+  
+
+  try {
+
+  // Then delete from lists table
+  console.log('[deleteList] Removing list from lists table');
+  await database.write(async () => {
+    const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
+    if (!list || list.length === 0) {
+      throw new Error('List not found in lists table');
+    }
+    await list[0].destroyPermanently();
+  });
+} catch (error) {
+  console.log('[deleteList] list was ALREADY GONE. WHERE DID IT GO..??:');
+}
+
+  // Finally remove items belonging to list from library
+  console.log('[deleteList] Removing items from library');
+  await database.write(async () => {
+    const items = await database.get<wItem>('items').query(Q.where('list_id', listId)).fetch();
+    if (items.length) {
+      for (const item of items) {
+        await item.destroyPermanently();
+      }
+    }
+  });
+
   // Sync after list deletion
   await syncUserData();
 }
@@ -755,24 +780,6 @@ export async function addItems(items: Item[]) {
     }
   });
   // Sync after adding items
-  await syncUserData();
-}
-
-export async function removeListFromFolder(ownerID: string, folderID: string, listID: string) {
-  await database.write(async () => {
-    const libraryList = await database.get<wLibraryList>('librarylists')
-      .query(
-        Q.where('owner_id', ownerID),
-        Q.where('folder_id', folderID),
-        Q.where('list_id', listID)
-      )
-      .fetch();
-
-    if (libraryList.length) {
-      await libraryList[0].destroyPermanently();
-    }
-  });
-  // Sync after removing list from folder
   await syncUserData();
 }
 

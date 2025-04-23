@@ -14,7 +14,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { List } from '../../classes/List';
 import { useColors } from '../../contexts/ColorContext';
 import { useAuth } from '../../contexts/UserContext';
-import { removeListFromFolder, deleteList } from '../../wdb/wdbService';
+import { deleteList } from '../../wdb/wdbService';
 import { Folder } from '../../classes/Folder';
 
 // Define type for sort order
@@ -216,7 +216,7 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
     if (!list || !currentUser) return;
 
     try {
-      await removeListFromFolder(currentUser.id, list.folderID, list.id);
+      await deleteList(list.id);
       currentUser.removeList(list);
       onRemoveFromLibrary();
       onClose();

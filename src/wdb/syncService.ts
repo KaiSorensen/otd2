@@ -139,6 +139,52 @@ export async function syncUserData() {
             }
           }
 
+          // For lists table, only pull lists that are in the user's library
+          if (watermelonTable === 'lists') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+              // Get all list_ids from librarylists for this user
+              const { data: libraryLists } = await supabase
+                .from('librarylists')
+                .select('list_id')
+                .eq('ownerid', session.user.id);
+              
+              if (libraryLists && libraryLists.length > 0) {
+                const listIds = libraryLists.map(lib => lib.list_id);
+                query = query.in('id', listIds);
+              } else {
+                // If no library lists, skip lists table entirely
+                continue;
+              }
+            } else {
+              // If no session, skip lists table entirely
+              continue;
+            }
+          }
+
+          // For items table, only pull items that belong to lists in the user's library
+          if (watermelonTable === 'items') {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user?.id) {
+              // Get all list_ids from librarylists for this user
+              const { data: libraryLists } = await supabase
+                .from('librarylists')
+                .select('list_id')
+                .eq('ownerid', session.user.id);
+              
+              if (libraryLists && libraryLists.length > 0) {
+                const listIds = libraryLists.map(lib => lib.list_id);
+                query = query.in('listid', listIds);
+              } else {
+                // If no library lists, skip items table entirely
+                continue;
+              }
+            } else {
+              // If no session, skip items table entirely
+              continue;
+            }
+          }
+
           const { data, error } = await query;
 
           if (error) throw error;

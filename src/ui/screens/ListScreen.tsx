@@ -18,7 +18,7 @@ import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { User } from '../../classes/User';
 import { Folder } from '../../classes/Folder';
-import { addItems, switchFolderOfList, storeNewItem, deleteItem, storeNewList, removeListFromFolder, deleteList, getItemsInList as local_getItemsInList } from '../../wdb/wdbService';
+import { addItems, switchFolderOfList, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList } from '../../wdb/wdbService';
 import { getItemsInList as remote_getItemsInList, retrieveUser } from '../../supabase/databaseService';
 // import ListImage from '../components/ListImage';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -209,7 +209,7 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
 };
 
 const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, forceUserUpdate } = useAuth();
   const { colors, isDarkMode } = useColors();
   const [list, setList] = useState<List>(initialList);
   const [items, setItems] = useState<Item[]>([]);
@@ -223,6 +223,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
   const [userFolders, setUserFolders] = useState<Folder[]>([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [listOwner, setListOwner] = useState<User | null>(null);
+
   
   // Add useEffect to check if list is in library and use that version if it exists
   useEffect(() => {
@@ -393,6 +394,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       }
       // Refresh the User to update the library UI
       await currentUser.refresh();
+      //force UI update
+      forceUserUpdate();
       // Update the local list state to reflect it's now in the library
       const updatedList = currentUser.listMap.get(list.id);
       if (updatedList) {
@@ -421,13 +424,15 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeListFromFolder(currentUser.id, list.folderID, list.id);
-              // Remove the list from the user's memory state
+              // First remove from memory
               currentUser.removeList(list);
-              // Refresh the list to update its library status
-              await currentUser.refresh();
+              // Then delete from database
+              await deleteList(list.id);
               // Update the local list state to reflect it's no longer in the library
               setList(initialList);
+              // Finally refresh user state
+              await currentUser.refresh();
+              forceUserUpdate();
             } catch (error) {
               console.error('Error removing list from library:', error);
               Alert.alert('Error', 'Failed to remove list from library. Please try again.');
@@ -515,6 +520,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
           setSelectedItem(null);
           // Refresh items list when returning from ItemScreen
           fetchItems();
+          //force UI update
         }}
         canEdit={!!(currentUser && currentUser.id === list.ownerID)}
       />

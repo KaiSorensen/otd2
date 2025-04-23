@@ -33,6 +33,7 @@ const LibraryScreen = () => {
   const [selectedList, setSelectedList] = useState<List | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   // Add useEffect to refresh expanded folders when currentUser changes
   useEffect(() => {
@@ -48,6 +49,8 @@ const LibraryScreen = () => {
       };
       addFolderIds(currentUser.rootFolders);
       setExpandedFolders(newExpandedFolders);
+      // Force a re-render when currentUser changes
+      setForceUpdate(prev => prev + 1);
     }
   }, [currentUser]);
 
@@ -59,7 +62,7 @@ const LibraryScreen = () => {
         setSelectedList(null);
       }
     }
-  }, [currentUser, selectedList]);
+  }, [currentUser, selectedList, forceUpdate]);
 
   const toggleFolder = (folderId: string) => {
     const newExpandedFolders = new Set(expandedFolders);

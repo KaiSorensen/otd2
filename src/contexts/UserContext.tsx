@@ -1,18 +1,20 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { User } from '../classes/User';
 import { subscribeToAuthChanges } from '../supabase/authService';
-import { retrieveUser } from '../wdb/wdbService';
+import { retrievePopulatedUser } from '../wdb/wdbService';
 
 interface AuthContextType {
   currentUser: User | null;
   loading: boolean;
   refreshUserData: () => Promise<void>;
+  forceUserUpdate: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({ 
   currentUser: null, 
   loading: true,
-  refreshUserData: async () => {} 
+  refreshUserData: async () => {},
+  forceUserUpdate: () => {}
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -26,19 +28,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Function to refresh user data that can be called from components
+  // Use case: to refresh the whole UI from top-down
   const refreshUserData = async () => {
     if (!currentUser) return;
     
     setLoading(true);
     try {
       // Retrieve the full user data from the database
-      const refreshedUser = await retrieveUser(currentUser.id);
+      const refreshedUser = await retrievePopulatedUser(currentUser.id);
       setCurrentUser(refreshedUser);
     } catch (error) {
       console.error('Error refreshing user data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Function to force a user update by creating a new user object
+  const forceUserUpdate = () => {
+    if (!currentUser) return;
+    
+    // Create a new user object with the same data to force a re-render
+    const updatedUser = new User(
+      currentUser.id,
+      currentUser.username,
+      currentUser.email,
+      currentUser.avatarURL,
+      currentUser.notifsEnabled
+    );
+    
+    // Copy all properties from the current user to the new user
+    Object.assign(updatedUser, currentUser);
+    
+    setCurrentUser(updatedUser);
   };
 
   useEffect(() => {
@@ -66,7 +88,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const value = {
     currentUser,
     loading,
-    refreshUserData
+    refreshUserData,
+    forceUserUpdate
   };
 
   return (
