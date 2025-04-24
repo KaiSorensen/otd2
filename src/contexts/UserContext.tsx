@@ -45,10 +45,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Function to force a user update by creating a new user object
-  const forceUserUpdate = () => {
+  const forceUserUpdate = async () => {
     if (!currentUser) return;
     
-    // Create a new user object with the same data to force a re-render
+    // First refresh the current user data
+    await currentUser.refresh();
+    
+    // Create a new user object with the refreshed data
     const updatedUser = new User(
       currentUser.id,
       currentUser.username,
@@ -56,8 +59,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       currentUser.avatarURL,
       currentUser.notifsEnabled
     );
-    updatedUser.refresh();
-    // Copy all properties from the current user to the new user
+    
+    // Copy all properties from the refreshed current user to the new user
     Object.assign(updatedUser, currentUser);
   
     setCurrentUser(updatedUser);

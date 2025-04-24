@@ -18,7 +18,7 @@ import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { User } from '../../classes/User';
 import { Folder } from '../../classes/Folder';
-import { addItems, switchFolderOfList, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList } from '../../wdb/wdbService';
+import { addItems, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList } from '../../wdb/wdbService';
 import { getItemsInList as remote_getItemsInList, retrieveUser } from '../../supabase/databaseService';
 // import ListImage from '../components/ListImage';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -272,7 +272,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       // if the list is in our library, then we need to fetch the items from the library
       if (list.folderID) {
         console.log("fetching items from library")
-        const listItems = await local_getItemsInList(list.id);
+        const listItems = await local_getItemsInList(list);
         setItems(listItems);
       } else {
         console.log("fetching items from remote")
@@ -327,7 +327,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       // Refresh the User to update the library UI
       await currentUser?.refresh();
       //force UI update
-      forceUserUpdate();
+      await forceUserUpdate();
     } catch (error) {
       console.error('Error saving list settings:', error);
       // Revert local state if save fails
@@ -403,9 +403,9 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
         console.log("added remote items to library")
       }
       // Refresh the User to update the library UI
-      // await currentUser.refresh();
+      await currentUser.refresh();
       //force UI update
-      forceUserUpdate();
+      await forceUserUpdate();
       // Update the local list state to reflect it's now in the library
       const updatedList = currentUser.listMap.get(list.id);
       if (updatedList) {
@@ -441,8 +441,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
               // Update the local list state to reflect it's no longer in the library
               setList(initialList);
               // Finally refresh user state
-              // await currentUser.refresh();
-              forceUserUpdate();
+              // await currentUser.refresh(); //this is now handled in the UserContext
+              await forceUserUpdate();
             } catch (error) {
               console.error('Error removing list from library:', error);
               Alert.alert('Error', 'Failed to remove list from library. Please try again.');

@@ -107,6 +107,10 @@ export async function storeNewList(list: List, adderID: string, folderID: string
       raw.notify_days = list.notifyDays;
       raw.created_at = new Date();
       raw.updated_at = new Date();
+
+      if (!list.currentItem) {
+        initializeTodayItem(list);
+      }
     });
   });
   // Sync after list creation
@@ -483,122 +487,136 @@ export async function getLibraryItemsBySubstring(user: User, substring: string):
 
 // ======= TODAY FUNCTIONS =======
 
-export async function getTodayListsForUser(userId: string): Promise<List[]> {
-  const libraryLists = await database.get<wLibraryList>('librarylists')
-    .query(
-      Q.where('owner_id', userId),
-      Q.where('today', true)
-    )
-    .fetch();
 
-  if (!libraryLists.length) {
-    return [];
+// This is handled by Population functions and give it to the runtime objects
+// export async function getTodayListsForUser(userId: string): Promise<List[]> {
+//   const libraryLists = await database.get<wLibraryList>('librarylists')
+//     .query(
+//       Q.where('owner_id', userId),
+//       Q.where('today', true)
+//     )
+//     .fetch();
+
+//   if (!libraryLists.length) {
+//     return [];
+//   }
+
+//   const lists: List[] = [];
+//   for (const libraryEntry of libraryLists) {
+//     const list = await database.get<wList>('lists')
+//       .query(Q.where('id2', libraryEntry.list_id))
+//       .fetch();
+
+//     lists.push(new List(
+//       list[0].id2,
+//       list[0].owner_id,
+//       list[0].title,
+//       list[0].description,
+//       list[0].cover_image_url,
+//       list[0].is_public,
+//       libraryEntry.folder_id,
+//       libraryEntry.sort_order,
+//       libraryEntry.today,
+//       libraryEntry.current_item,
+//       libraryEntry.notify_on_new,
+//       libraryEntry.notify_time,
+//       libraryEntry.notify_days,
+//       libraryEntry.order_index
+//     ));
+//   }
+
+//   return lists;
+// }
+
+
+// export async function getTodayItemsForUser(userId: string): Promise<Item[]> {
+//   const todayLists = await getTodayListsForUser(userId);
+//   if (!todayLists.length) {
+//     return [];
+//   }
+
+//   const listIds = todayLists.map(list => list.id);
+//   const items = await database.get<wItem>('items')
+//     .query(
+//       Q.where('list_id', Q.oneOf(listIds))
+//     )
+//     .fetch();
+
+//   return items.map((item) => new Item(
+//     item.id2,
+//     item.list_id,
+//     item.title,
+//     item.content,
+//     item.image_urls,
+//     item.order_index,
+//     item.created_at,
+//     item.updated_at
+//   ));
+// }
+
+export async function initializeTodayItem(list: List) {
+  if (list.currentItem) {
+    return;
   }
 
-  const lists: List[] = [];
-  for (const libraryEntry of libraryLists) {
-    const list = await database.get<wList>('lists')
-      .query(Q.where('id2', libraryEntry.list_id))
-      .fetch();
-
-    lists.push(new List(
-      list[0].id2,
-      list[0].owner_id,
-      list[0].title,
-      list[0].description,
-      list[0].cover_image_url,
-      list[0].is_public,
-      libraryEntry.folder_id,
-      libraryEntry.sort_order,
-      libraryEntry.today,
-      libraryEntry.current_item,
-      libraryEntry.notify_on_new,
-      libraryEntry.notify_time,
-      libraryEntry.notify_days,
-      libraryEntry.order_index
-    ));
+  const items = await getItemsInList(list);
+  if (!items.length) {
+    return;
   }
-
-  return lists;
+  list.currentItem = items[0].id;
+  await updateList(list.id, { currentItem: list.currentItem });
 }
 
-export async function getTodayItemsForUser(userId: string): Promise<Item[]> {
-  const todayLists = await getTodayListsForUser(userId);
+export async function rotateTodayItemsAllLists(user: User) {
+  const todayLists = user.getTodayLists();
   if (!todayLists.length) {
-    return [];
-  }
-
-  const listIds = todayLists.map(list => list.id);
-  const items = await database.get<wItem>('items')
-    .query(
-      Q.where('list_id', Q.oneOf(listIds))
-    )
-    .fetch();
-
-  return items.map((item) => new Item(
-    item.id2,
-    item.list_id,
-    item.title,
-    item.content,
-    item.image_urls,
-    item.order_index,
-    item.created_at,
-    item.updated_at
-  ));
-}
-
-export async function rotateTodayItemsAllLists(userId: string) {
-  const todayLists = await getTodayListsForUser(userId);
-  if (!todayLists.length) {
+    console.log('no today lists found');
     return;
   }
 
   for (const list of todayLists) {
-    rotateTodayItemForList(list.id, "next");
+    rotateTodayItemForList(list, "next"); //this function call handles the database update
   }
 }
 
-export async function rotateTodayItemForList(listId: string, direction: "next" | "prev") {
+export async function rotateTodayItemForList(list: List, direction: "next" | "prev") {
   if (direction !== "next" && direction !== "prev") {
     throw new Error("Invalid direction");
   }
 
-  const list = await retrieveList(listId);
-  const items = await getItemsInList(listId);
-  if (!items.length || !list) {
+  const items = await getItemsInList(list); // already sorted by sortOrder
+
+  if (!items.length) {
+    console.log('[rotateTodayItemForList] no items found');
+    list.currentItem = null;
+    await updateList(list.id, { currentItem: null });
     return;
   }
-  const currentItemId = list.currentItem;
-  
-  switch (list.sortOrder) {
-    case "date-first":
-      // sort by date added, ascending
-      items.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-    break;
-    case "date-last":
-      // sort by date added, descending
-      items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    break;
-    case "alphabetical":
-      //sort by title or content, ascending
-      items.sort((a, b) => a.content.localeCompare(b.content));
-    break;
-    case "manual":
-      // sort by order index column
-      items.sort((a, b) => a.orderIndex - b.orderIndex);
-    break;
+  if (items.length === 1) {
+    console.log('[rotateTodayItemForList] only one item, no rotation needed');
+    return;
   }
+
+  const currentItemId = list.currentItem;
+  if (!currentItemId) {
+    console.log('[rotateTodayItemForList] no current item, THIS LOGICALLY SHOULD NOT HAPPEN, initializing item');
+    await initializeTodayItem(list);
+    return;
+  }
+  console.log('[rotateTodayItemForList] current item id:', currentItemId);
   // get index of current item
   const currentItemIndex = items.findIndex(item => item.id === currentItemId);
   // get next item id (wrapping around if at end)
   if (direction === "next") {
     const nextItemId = items[(currentItemIndex + 1) % items.length].id;
     // update list with next item
-    await updateList(listId, { currentItem: nextItemId });
+    list.currentItem = nextItemId;
+    await updateList(list.id, { currentItem: nextItemId });
   } else if (direction === "prev") {
     const prevItemId = items[(currentItemIndex - 1 + items.length) % items.length].id;
     // update list with previous item
-    await updateList(listId, { currentItem: prevItemId });
+    list.currentItem = prevItemId;
+    await updateList(list.id, { currentItem: prevItemId });
   }
 }
 
@@ -681,7 +699,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>): Promis
 type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
 type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
-export async function updateLibraryListConfig(ownerID: string, folderID: string, listID: string, config: {
+export async function updateLibraryList(ownerID: string, folderID: string, listID: string, config: {
   sortOrder?: SortOrder;
   today?: boolean;
   currentItem?: string | null;
@@ -809,12 +827,19 @@ export async function deleteList(listId: string): Promise<void> {
   // Sync after list deletion
   await syncUserData();
 }
-
+// TODO: what if a user deletes an item from a list than another user has in library? What happens to currentItem? 
+// TODO: if last item, currentItem should be set to null, notifyOnNew should be set to false, today
+// TODO: if first item, currentItem should be set to that item
 export async function deleteItem(itemId: string): Promise<void> {
   await database.write(async () => {
     const item = await database.get<wItem>('items').query(Q.where('id2', itemId)).fetch();
     if (!item || item.length === 0) {
       throw new Error('Item not found');
+    }
+    const list = await retrieveList(item[0].list_id);
+    if (list?.currentItem === itemId) {
+      await rotateTodayItemForList(list, "next");
+      
     }
     const id2 = item[0].id2;
     await item[0].markAsDeleted();
@@ -822,7 +847,9 @@ export async function deleteItem(itemId: string): Promise<void> {
     (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
     (database as any).adapter.deletedRecords.items = (database as any).adapter.deletedRecords.items || [];
     (database as any).adapter.deletedRecords.items.push(id2);
+
   });
+
   // Sync after item deletion
   await syncUserData();
 }
@@ -848,15 +875,15 @@ export async function addItems(items: Item[]) {
   await syncUserData();
 }
 
-export async function getItemsInList(listId: string): Promise<Item[]> {
-  console.log('[getItemsInList] Starting to fetch items for list:', listId);
-  const items = await database.get<wItem>('items')
-    .query(Q.where('list_id', listId))
+export async function getItemsInList(list: List): Promise<Item[]> {
+  console.log('[getItemsInList] Starting to fetch items for list:', list.id);
+  let itemsData = await database.get<wItem>('items')
+    .query(Q.where('list_id', list.id))
     .fetch();
 
-  console.log('[getItemsInList] Retrieved items:', items.length);
+  console.log('[getItemsInList] Retrieved items:', itemsData.length);
 
-  return items.map((item) => {
+  let itemsObjects = itemsData.map((item) => {
     console.log('[getItemsInList] Mapping item:', item.id2, item.title);
     return new Item(
       item.id2,
@@ -869,6 +896,23 @@ export async function getItemsInList(listId: string): Promise<Item[]> {
       item.updated_at
     );
   });
+
+  switch (list.sortOrder) {
+    case "date-first":
+      itemsObjects.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    break;
+    case "date-last":
+      itemsObjects.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    break;
+    case "alphabetical":
+      itemsObjects.sort((a, b) => a.content.localeCompare(b.content));
+    break;
+    case "manual":
+      itemsObjects.sort((a, b) => a.orderIndex - b.orderIndex);
+    break;
+  }
+
+  return itemsObjects;
 }
 
 export async function switchFolderOfList(ownerID: string, oldFolderID: string, newFolderID: string, listID: string) {

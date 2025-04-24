@@ -1,4 +1,5 @@
-import { retrieveList, updateList, updateLibraryListConfig } from '../wdb/wdbService';
+import { retrieveList, updateList, retrieveItem, updateLibraryList, rotateTodayItemForList, initializeTodayItem } from '../wdb/wdbService';
+import { Item } from './Item';
 
 type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
 type NotifyDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
@@ -55,6 +56,8 @@ export class List {
         this._notifyTime = notifyTime;
         this._notifyDays = notifyDays;
         this._orderIndex = orderIndex;
+
+        this.ensureCurrentItem();
     }
 
     // Getters for read-only properties
@@ -96,6 +99,23 @@ export class List {
     get notifyDays(): NotifyDay | null { return this._notifyDays; }
     set notifyDays(value: NotifyDay | null) { this._notifyDays = value; }
 
+    async ensureCurrentItem(): Promise<void> {
+        if (!this._currentItem) {
+            await initializeTodayItem(this);
+        }
+    }
+
+    async rotateTodayItem(direction: "next" | "prev"): Promise<void> {
+        await rotateTodayItemForList(this, direction);
+    }
+
+    async getTodayItem(): Promise<Item | null> {
+        if (!this._currentItem) {
+            return null;
+        }
+        return await retrieveItem(this._currentItem);
+    }
+
     // Check if the current user is the owner of the list
     isOwner(currentUserID: string): boolean {
         return this._ownerID === currentUserID;
@@ -115,7 +135,7 @@ export class List {
         
         // If the list is in the user's library, update the library configuration
         if (this._ownerID && this._folderID) {
-            await updateLibraryListConfig(userID, this._folderID, this._id, {
+            await updateLibraryList(userID, this._folderID, this._id, {
                 sortOrder: this._sortOrder,
                 today: this._today,
                 currentItem: this._currentItem,
