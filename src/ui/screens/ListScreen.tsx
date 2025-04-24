@@ -380,7 +380,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteItem(item.id);
+              await deleteItem(currentUser.id, item.id);
               setItems(items.filter(i => i.id !== item.id));
             } catch (error) {
               console.error('Error deleting item:', error);

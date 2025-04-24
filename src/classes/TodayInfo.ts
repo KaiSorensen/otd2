@@ -14,8 +14,7 @@ export class TodayInfo {
         this._todayLists = todayLists;
         this._todayItems = new Map<string, Item | null>();
 
-        // Initialize today items asynchronously
-        this.updateTodayLists(todayLists);
+        this.refreshTodayItems();
     }
 
     get todayLists(): List[] { return this._todayLists; }
