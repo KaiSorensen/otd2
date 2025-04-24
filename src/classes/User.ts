@@ -12,6 +12,7 @@ export class User {
     private _email: string;
     private _avatarURL: string | null;
     private _notifsEnabled: boolean;
+    private _selectedTodayListIndex: number;
 
     // these are not in User table of the database, but they get populated when logged in
     private _rootFolders: Folder[];
@@ -31,6 +32,7 @@ export class User {
         this._email = email;
         this._avatarURL = avatarURL;
         this._notifsEnabled = notifsEnabled;
+        this._selectedTodayListIndex = 0;
 
         this._rootFolders = [];
         this._listMap = new Map<string, List>();
@@ -57,6 +59,9 @@ export class User {
 
     get notifsEnabled(): boolean { return this._notifsEnabled; }
     set notifsEnabled(value: boolean) { this._notifsEnabled = value; }
+
+    get selectedTodayListIndex(): number { return this._selectedTodayListIndex; }
+    set selectedTodayListIndex(value: number) { this._selectedTodayListIndex = value; }
 
     get rootFolders(): Folder[] { return this._rootFolders; }
     set rootFolders(value: Folder[]) { this._rootFolders = value; }

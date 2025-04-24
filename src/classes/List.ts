@@ -105,8 +105,8 @@ export class List {
         }
     }
 
-    async rotateTodayItem(direction: "next" | "prev"): Promise<void> {
-        await rotateTodayItemForList(this, direction);
+    async rotateTodayItem(userID: string, direction: "next" | "prev"): Promise<void> {
+        await rotateTodayItemForList(userID, this, direction);
     }
 
     async getTodayItem(): Promise<Item | null> {

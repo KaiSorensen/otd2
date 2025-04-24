@@ -1,6 +1,6 @@
 import { Item } from "./Item";
 import { List } from "./List";
-import { retrieveItem } from '../wdb/wdbService';
+import { retrieveItem, rotateTodayItemForList } from '../wdb/wdbService';
 
 export class TodayInfo {
 
@@ -14,7 +14,8 @@ export class TodayInfo {
         this._todayLists = todayLists;
         this._todayItems = new Map<string, Item | null>();
 
-        this.refreshTodayItems();
+        // Initialize today items asynchronously
+        this.updateTodayLists(todayLists);
     }
 
     get todayLists(): List[] { return this._todayLists; }
@@ -25,34 +26,34 @@ export class TodayInfo {
     
 
     //database functions
-    public refreshTodayItems() {
+    public async refreshTodayItems() {
         console.log(`Refreshing today items for ${this.todayLists.length} lists`);
-        for (const list of this.todayLists) {
+        const promises = this.todayLists.map(async (list) => {
             if (list.currentItem) {
-                console.log(`Getting item for list ${list.id}`);
-                retrieveItem(list.currentItem).then(item => {
+                try {
+                    const item = await retrieveItem(list.currentItem);
                     this.todayItems.set(list.id, item);
-                }).catch(error => {
+                } catch (error) {
                     console.error(`Failed to retrieve item for list ${list.id}:`, error);
                     this.todayItems.set(list.id, null);
-                });
+                }
+            } else {
+                this.todayItems.set(list.id, null);
             }
-        }
+        });
+        await Promise.all(promises);
     }
-    public updateTodayLists(lists: List[]) {
+
+    public async updateTodayLists(lists: List[]) {
         this.todayLists = lists;
-        this.refreshTodayItems();
+        await this.refreshTodayItems();
     }
 
-    // for quick change to UI
-    public changeTodayItemForList(listID: string, item: Item | null) {
-        this.todayItems.set(listID, item);
-    }
-
-    getItemForList(listID: string): Item | null {
-        console.log(`Getting item for list ${listID}`);
+    public getItemForList(listID: string): Item | null {
         const item = this.todayItems.get(listID);
         console.log(`Item for list ${listID}:`, item?.title);
         return item || null;
     }
+
+    
 }

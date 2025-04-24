@@ -7,7 +7,8 @@ import {
   SafeAreaView, 
   TouchableOpacity,
   Dimensions,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
@@ -16,6 +17,7 @@ import { useAuth } from '../../contexts/UserContext';
 import { useColors } from '../../contexts/ColorContext';
 import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const TodayScreen = () => {
   const { currentUser, loading, forceUserUpdate } = useAuth();
@@ -41,12 +43,11 @@ const TodayScreen = () => {
       try {
         const lists = currentUser.getTodayLists();
         const info = new TodayInfo(lists);
+        await info.refreshTodayItems();
         setTodayInfo(info);
         
-        // Select first list if available
-        if (lists.length > 0) {
-          setSelectedListIndex(0);
-        }
+        // Use the selected list index from the user
+        setSelectedListIndex(currentUser.selectedTodayListIndex);
       } catch (error) {
         console.error('Error fetching today info:', error);
       } finally {
@@ -61,23 +62,22 @@ const TodayScreen = () => {
 
   // Update displayed item when todayInfo changes or items load
   useEffect(() => {
-    if (todayInfo && todayInfo.todayLists.length > 0) {
-      const selectedList = todayInfo.todayLists[selectedListIndex];
-      if (selectedList) {
-        // Add a small delay to allow the async item retrieval to complete
-        const timer = setTimeout(() => {
+    const updateDisplayedItem = async () => {
+      if (todayInfo && todayInfo.todayLists.length > 0) {
+        const selectedList = todayInfo.todayLists[selectedListIndex];
+        if (selectedList) {
           const item = todayInfo.getItemForList(selectedList.id);
           setDisplayedItem(item);
-        }, 300);
-        
-        return () => clearTimeout(timer);
+        }
       }
-    }
+    };
+
+    updateDisplayedItem();
   }, [todayInfo, selectedListIndex]);
 
   // Handle chip selection
   const handleChipPress = (index: number) => {
-    if (!todayInfo) return;
+    if (!todayInfo || !currentUser) return;
     
     // If the chip is already selected, open the list view
     if (selectedListIndex === index) {
@@ -86,12 +86,38 @@ const TodayScreen = () => {
     }
     
     setSelectedListIndex(index);
+    currentUser.selectedTodayListIndex = index;
     scrollToSelectedChip(index);
     
     // Update displayed item for the selected list
     const selectedList = todayInfo.todayLists[index];
     const selectedItem = todayInfo.getItemForList(selectedList.id);
     setDisplayedItem(selectedItem);
+  };
+
+  // Handle rotating all items
+  const handleRotateAllItems = async () => {
+    if (!todayInfo || !currentUser) return;
+
+    for (const list of todayInfo.todayLists) {
+      await list.rotateTodayItem(currentUser.id, "next");
+    }
+
+    // Refresh the today info
+    const lists = currentUser.getTodayLists();
+    const info = new TodayInfo(lists);
+    await info.refreshTodayItems();
+    setTodayInfo(info);
+
+    // Update the displayed item for the current list
+    const selectedList = info.todayLists[selectedListIndex];
+    if (selectedList) {
+      const item = info.getItemForList(selectedList.id);
+      setDisplayedItem(item);
+    }
+
+    // Force UI update
+    await forceUserUpdate();
   };
 
   // Scroll to center the selected chip
@@ -172,6 +198,12 @@ const TodayScreen = () => {
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>Today</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your daily items</Text>
+        <TouchableOpacity 
+          style={[styles.rotateButton, { backgroundColor: colors.primary }]}
+          onPress={handleRotateAllItems}
+        >
+          <Icon name="refresh-outline" size={24} color="white" />
+        </TouchableOpacity>
       </View>
 
       {todayInfo.todayLists.length > 0 ? (
@@ -306,6 +338,27 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
+  },
+  rotateButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
 });
 

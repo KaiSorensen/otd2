@@ -61,7 +61,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     );
     
     // Copy all properties from the refreshed current user to the new user
-    Object.assign(updatedUser, currentUser);
+    updatedUser.rootFolders = currentUser.rootFolders;
+    updatedUser.listMap = currentUser.listMap;
+    updatedUser.selectedTodayListIndex = currentUser.selectedTodayListIndex;
   
     setCurrentUser(updatedUser);
   };

@@ -575,11 +575,11 @@ export async function rotateTodayItemsAllLists(user: User) {
   }
 
   for (const list of todayLists) {
-    rotateTodayItemForList(list, "next"); //this function call handles the database update
+    rotateTodayItemForList(user.id, list, "next"); //this function call handles the database update
   }
 }
 
-export async function rotateTodayItemForList(list: List, direction: "next" | "prev") {
+export async function rotateTodayItemForList(userID: string ,list: List, direction: "next" | "prev") {
   if (direction !== "next" && direction !== "prev") {
     throw new Error("Invalid direction");
   }
@@ -589,7 +589,8 @@ export async function rotateTodayItemForList(list: List, direction: "next" | "pr
   if (!items.length) {
     console.log('[rotateTodayItemForList] no items found');
     list.currentItem = null;
-    await updateList(list.id, { currentItem: null });
+    // Update library list config for currentItem via librarylists table
+    await updateLibraryList(list.ownerID, list.folderID, list.id, { currentItem: null });
     return;
   }
   if (items.length === 1) {
@@ -609,14 +610,16 @@ export async function rotateTodayItemForList(list: List, direction: "next" | "pr
   // get next item id (wrapping around if at end)
   if (direction === "next") {
     const nextItemId = items[(currentItemIndex + 1) % items.length].id;
-    // update list with next item
+    // update library list config with next item
     list.currentItem = nextItemId;
-    await updateList(list.id, { currentItem: nextItemId });
+    console.log('[rotateTodayItemForList] updating library list with next item:', nextItemId);
+    await updateLibraryList(userID, list.folderID, list.id, { currentItem: nextItemId });
   } else if (direction === "prev") {
     const prevItemId = items[(currentItemIndex - 1 + items.length) % items.length].id;
-    // update list with previous item
+    // update library list config with previous item
     list.currentItem = prevItemId;
-    await updateList(list.id, { currentItem: prevItemId });
+    console.log('[rotateTodayItemForList] updating library list with previous item:', prevItemId);
+    await updateLibraryList(userID, list.folderID, list.id, { currentItem: prevItemId });
   }
 }
 
@@ -830,7 +833,7 @@ export async function deleteList(listId: string): Promise<void> {
 // TODO: what if a user deletes an item from a list than another user has in library? What happens to currentItem? 
 // TODO: if last item, currentItem should be set to null, notifyOnNew should be set to false, today
 // TODO: if first item, currentItem should be set to that item
-export async function deleteItem(itemId: string): Promise<void> {
+export async function deleteItem(itemId: string, userID: string): Promise<void> {
   await database.write(async () => {
     const item = await database.get<wItem>('items').query(Q.where('id2', itemId)).fetch();
     if (!item || item.length === 0) {
@@ -838,7 +841,7 @@ export async function deleteItem(itemId: string): Promise<void> {
     }
     const list = await retrieveList(item[0].list_id);
     if (list?.currentItem === itemId) {
-      await rotateTodayItemForList(list, "next");
+      await rotateTodayItemForList(userID, list, "next");
       
     }
     const id2 = item[0].id2;
@@ -881,10 +884,10 @@ export async function getItemsInList(list: List): Promise<Item[]> {
     .query(Q.where('list_id', list.id))
     .fetch();
 
-  console.log('[getItemsInList] Retrieved items:', itemsData.length);
+  // console.log('[getItemsInList] Retrieved items:', itemsData.length);
 
   let itemsObjects = itemsData.map((item) => {
-    console.log('[getItemsInList] Mapping item:', item.id2, item.title);
+    // console.log('[getItemsInList] Mapping item:', item.id2, item.title);
     return new Item(
       item.id2,
       item.list_id,
