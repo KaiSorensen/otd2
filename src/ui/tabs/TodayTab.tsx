@@ -18,7 +18,7 @@ import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
 
 const TodayScreen = () => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, forceUserUpdate } = useAuth();
   const { colors } = useColors();
   const [todayInfo, setTodayInfo] = useState<TodayInfo | null>(null);
   const [selectedListIndex, setSelectedListIndex] = useState<number>(0);
@@ -57,7 +57,7 @@ const TodayScreen = () => {
     if (!loading) {
       fetchTodayInfo();
     }
-  }, [currentUser, loading]);
+  }, [currentUser, loading, forceUserUpdate]);
 
   // Update displayed item when todayInfo changes or items load
   useEffect(() => {

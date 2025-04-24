@@ -56,10 +56,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       currentUser.avatarURL,
       currentUser.notifsEnabled
     );
-    
+    updatedUser.refresh();
     // Copy all properties from the current user to the new user
     Object.assign(updatedUser, currentUser);
-    
+  
     setCurrentUser(updatedUser);
   };
 

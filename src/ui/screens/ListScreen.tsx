@@ -324,6 +324,10 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       if (currentUser) {
         await list.save(currentUser.id);
       }
+      // Refresh the User to update the library UI
+      await currentUser?.refresh();
+      //force UI update
+      forceUserUpdate();
     } catch (error) {
       console.error('Error saving list settings:', error);
       // Revert local state if save fails
@@ -399,7 +403,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
         console.log("added remote items to library")
       }
       // Refresh the User to update the library UI
-      await currentUser.refresh();
+      // await currentUser.refresh();
       //force UI update
       forceUserUpdate();
       // Update the local list state to reflect it's now in the library
@@ -437,7 +441,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
               // Update the local list state to reflect it's no longer in the library
               setList(initialList);
               // Finally refresh user state
-              await currentUser.refresh();
+              // await currentUser.refresh();
               forceUserUpdate();
             } catch (error) {
               console.error('Error removing list from library:', error);
