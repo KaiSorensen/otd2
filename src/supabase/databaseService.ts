@@ -7,7 +7,9 @@ import { supabase } from './supabase';
 // import { useNetwork } from '../contexts/NetworkContext';
 // import { v4 as uuidv4 } from 'uuid';
 
-// the file currently disregards isInternetReachable
+
+
+// TODO: file currently disregards isInternetReachable
 
 
 
@@ -92,7 +94,6 @@ export async function getPublicListsBySubstring(substring: string, isInternetRea
     list.description, 
     list.coverimageurl, 
     list.ispublic,
-    null, // currentUserID
     '', // folderID
     "date-first", // default sortOrder
     false, // today
@@ -131,7 +132,6 @@ export async function getPublicListsByUser(userId: string, isInternetReachable: 
       list.description, 
       list.coverimageurl, 
       list.ispublic, 
-      viewerUserId || null, // currentUserID (the user viewing the list)
       '', // folderID
       "date-first", // default sortOrder
       false, // today
@@ -158,6 +158,28 @@ export async function getItemsInList(listID: string): Promise<Item[]> {
     item.title || '',
     item.content || '',
     item.imageurls || [],
-    item.orderindex || 0
+    item.orderindex || 0,
+    item.createdat || new Date(),
+    item.updatedat || new Date()
   ));
 }
+
+
+// LIBRARY FUNCTIONS
+
+// export async function setListToOwnersLibraryConfig(list: List, userID: string) {
+//   const { data, error } = await supabase.from('librarylists').upsert({
+//     owner_id: userID,
+//     list_id: list.id,
+//   });
+//   if (!data || error) {
+//     throw error;
+//   }
+//   list.sortOrder = data.sort_order;
+//   list.today = data.today;
+//   list.currentItem = data.current_item;
+//   list.notifyOnNew = data.notify_on_new;
+//   list.notifyTime = data.notify_time;
+//   list.notifyDays = data.notify_days;
+//   list.orderIndex = data.order_index;
+// }

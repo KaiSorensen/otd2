@@ -176,29 +176,27 @@ export class User {
         this._todayInfo.updateTodayLists(this.getTodayLists());
     }
 
-    public async switchFolderOfList(list: List, newFolderId: string) {
-        if (!list.currentUserID) {
-            throw new Error('List is not in any user\'s library');
-        }
+    public async switchFolderOfList(userID: string, list: List, newFolderId: string) {
+        console.log("[switchFolderOfList] switching folder of list", list.id, "to", newFolderId);
 
+        const foundList = this.getList(list.id);
+        if (!foundList) {
+            throw new Error('ListID not found in global user object');
+        }
         // Remove list from current folder
         const currentFolder = this.getFolder(list.folderID);
-        if (currentFolder) {
-            currentFolder.removeList(list);
-        }
-
-        // Add list to new folder
         const newFolder = this.getFolder(newFolderId);
-        if (newFolder) {
+
+        if (currentFolder && newFolder) {
+            // First update the runtime objects
+            list.folderID = newFolderId;
+            currentFolder.removeList(list);
             newFolder.addList(list);
-            // Update the list's folder ID in memory
-            (list as any)._folderID = newFolderId;
-            
-            // Update the database
-            await switchFolderOfList(list.currentUserID, list.folderID, newFolderId, list.id);
+            // Now update the database
+            await switchFolderOfList(userID, currentFolder.id, newFolder.id, list.id);
         } else {
-            throw new Error('New folder not found');
-        }
+            throw new Error('Folder not found');
+        }     
     }
 }
 

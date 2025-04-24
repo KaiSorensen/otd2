@@ -204,7 +204,7 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
     if (!currentUser) return;
     
     try {
-      await currentUser.switchFolderOfList(list, newFolderId);
+      await currentUser.switchFolderOfList(currentUser.id, list, newFolderId);
       onSave({ folderID: newFolderId });
     } catch (error) {
       console.error('Error moving list to new folder:', error);

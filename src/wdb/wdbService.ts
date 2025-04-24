@@ -99,7 +99,7 @@ export async function storeNewList(list: List, adderID: string, folderID: string
       raw.owner_id = adderID;
       raw.list_id = list.id;
       raw.folder_id = folderID;
-      raw.sort_order = list.sortOrder;
+      raw.sort_order = list.sortOrder || 'date-first';
       raw.today = list.today;
       raw.current_item = list.currentItem;
       raw.notify_on_new = list.notifyOnNew;
@@ -681,7 +681,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>): Promis
 type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
 type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
-export async function updateLibraryListConfig(userID: string, folderID: string, listID: string, config: {
+export async function updateLibraryListConfig(ownerID: string, folderID: string, listID: string, config: {
   sortOrder?: SortOrder;
   today?: boolean;
   currentItem?: string | null;
@@ -693,13 +693,19 @@ export async function updateLibraryListConfig(userID: string, folderID: string, 
   await database.write(async () => {
     const libraryList = await database.get<wLibraryList>('librarylists')
       .query(
-        Q.where('owner_id', userID),
+        Q.where('owner_id', ownerID),
         Q.where('folder_id', folderID),
         Q.where('list_id', listID)
       )
       .fetch();
 
-    if (!libraryList.length) {
+
+
+    if (libraryList.length === 0) {
+      console.log('FAILED TO FIND LIBRARY LIST:');
+      console.log('ownerID:', ownerID);
+      console.log('folderID:', folderID);
+      console.log('listID:', listID);
       throw new Error('LibraryList is not in user library');
     }
 
@@ -875,28 +881,21 @@ export async function switchFolderOfList(ownerID: string, oldFolderID: string, n
       )
       .fetch();
 
-    if (libraryList.length) {
-      const oldConfig = libraryList[0];
-      const oldCreatedAt = oldConfig.created_at || new Date();
-      await oldConfig.markAsDeleted();
-
-      await database.get<wLibraryList>('librarylists').create(raw => {
-        raw.owner_id = ownerID;
-        raw.folder_id = newFolderID;
-        raw.list_id = listID;
-        raw.sort_order = oldConfig.sort_order;
-        raw.today = oldConfig.today;
-        raw.current_item = oldConfig.current_item;
-        raw.notify_on_new = oldConfig.notify_on_new;
-        raw.notify_time = oldConfig.notify_time;
-        raw.notify_days = oldConfig.notify_days;
-        raw.order_index = oldConfig.order_index;
-        raw.created_at = oldCreatedAt;
-        raw.updated_at = new Date();
-      });
-    } else {
-      console.log('[switchFolderOfList] List not found in library');
-    }
+      if (libraryList.length === 0) {
+        console.log('[switchFolderOfList] FAILED TO FIND LIBRARY LIST:');
+        console.log('ownerID:', ownerID);
+        console.log('old folderID:', oldFolderID);
+        console.log('new folderID:', newFolderID);
+        console.log('listID:', listID);
+        throw new Error('LibraryList is not in user library');
+      }
+      if (libraryList.length) {
+        const oldConfig = libraryList[0];
+        await oldConfig.update(raw => {
+          raw.folder_id = newFolderID;
+          raw.updated_at = new Date();
+        });
+      }
   });
   // Sync after moving list to folder
   await syncUserData();
