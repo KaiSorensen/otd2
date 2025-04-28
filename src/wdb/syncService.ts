@@ -99,44 +99,42 @@ function isoToDate(val: any): Date | null {
   return new Date(val);
 }
 
-// A queue to manage sync calls
-const syncQueue: (() => Promise<void>)[] = [];
 let isSyncing = false;
-let syncTimeout: NodeJS.Timeout | null = null;
 
-// Function to process the sync queue with debounce
-async function processSyncQueue() {
+// Remove the queue and modify the sync logic
+let syncTimeout: NodeJS.Timeout | null = null;
+let pendingSyncOperation: (() => Promise<void>) | null = null;
+
+// Function to process the sync with debounce
+async function processSync() {
   if (isSyncing) return;
   if (syncTimeout) clearTimeout(syncTimeout);
   console.log(`Sync call triggered at: ${new Date().toISOString()}`);
   syncTimeout = setTimeout(async () => {
-    if (syncQueue.length === 0) return;
+    if (!pendingSyncOperation) return;
     console.log(`Executing sync at: ${new Date().toISOString()}`);
     isSyncing = true;
-    const syncOperation = syncQueue.shift();
-    if (syncOperation) {
-      try {
-        console.log('Starting sync operation');
-        await syncOperation();
-        console.log('Sync operation completed successfully');
-      } catch (error) {
-        console.error('Sync operation failed:', error);
-      }
+    try {
+      console.log('Starting sync operation');
+      await pendingSyncOperation();
+      console.log('Sync operation completed successfully');
+    } catch (error) {
+      console.error('Sync operation failed:', error);
     }
     isSyncing = false;
-    processSyncQueue(); // Process the next operation in the queue
+    pendingSyncOperation = null;
   }, 1000); // Wait 1 second to collect all sync calls
 }
 
-// Function to add a sync operation to the queue
-export function addSyncOperation(syncOperation: () => Promise<void>) {
-  syncQueue.push(syncOperation);
-  processSyncQueue();
+// Function to set a sync operation
+export function setSyncOperation(syncOperation: () => Promise<void>) {
+  pendingSyncOperation = syncOperation;
+  processSync();
 }
 
 // Modify syncUserData to use the syncCalls layer
 export async function syncUserData() {
-  addSyncOperation(async () => {
+  setSyncOperation(async () => {
     // If already syncing, skip this sync
     if (isSyncing) {
       console.log('Sync already in progress, skipping...');
