@@ -5,7 +5,7 @@ import { User as wUser, Folder as wFolder, List as wList, Item as wItem, Library
 import { User, Folder, List, Item } from '../classes';
 
 import { v4 as uuidv4 } from 'uuid';
-import { syncUserData } from './syncService';
+import { iMadeAChange } from './pendingSyncService';
 
 // Fallback UUID generator in case the standard one fails
 function generateFallbackUUID() {
@@ -51,7 +51,7 @@ export async function storeNewUser(user: User) {
   console.log('User stored in k;ajsdhfi;asufhf');
   // Sync after user creation
   console.log("SYNCING NEW USER KJAHIUOFDHIUOHUIOWRHGWV");
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function storeNewFolder(folder: Folder) {
@@ -68,7 +68,7 @@ export async function storeNewFolder(folder: Folder) {
     });
   });
   // Sync after folder creation
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function storeNewList(list: List, adderID: string, folderID: string) {
@@ -90,6 +90,20 @@ export async function storeNewList(list: List, adderID: string, folderID: string
   console.log("[storeNewList] inserting library list", list.id);
 
   await database.write(async () => {
+    // Check if library list already exists
+    const existingLibraryList = await database.get<wLibraryList>('librarylists')
+      .query(
+        Q.where('owner_id', adderID),
+        Q.where('folder_id', folderID),
+        Q.where('list_id', list.id)
+      )
+      .fetch();
+
+    if (existingLibraryList.length > 0) {
+      console.log('[storeNewList] Library list already exists, skipping creation');
+      return;
+    }
+
     await database.get<wLibraryList>('librarylists').create(raw => {
       const uuid = safeUUID();
       if (!uuid) {
@@ -114,7 +128,7 @@ export async function storeNewList(list: List, adderID: string, folderID: string
     });
   });
   // Sync after list creation
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function storeNewItem(item: Item) {
@@ -133,7 +147,7 @@ export async function storeNewItem(item: Item) {
     });
   });
   // Sync after item creation
-  await syncUserData();
+  iMadeAChange();
 }
 
 // ======= SINGLE RETRIEVE FUNCTIONS =======
@@ -604,26 +618,50 @@ export async function rotateTodayItemForList(userID: string, list: List, directi
     return;
   }
   console.log('[rotateTodayItemForList] current item id:', currentItemId);
+  
   // get index of current item
   const currentItemIndex = items.findIndex(item => item.id === currentItemId);
-  // get next item id (wrapping around if at end)
+  let newItemId;
+  
+  // get next/prev item id (wrapping around if at end)
   if (direction === "next") {
-    const nextItemId = items[(currentItemIndex + 1) % items.length].id;
-    // update list with next item
-    list.currentItem = nextItemId;
-    console.log('[rotateTodayItemForList] updating list with next item:', nextItemId);
-    // await updateList(list.id, { currentItem: nextItemId });
-    // Also update the librarylist
-    await updateLibraryList(userID, list.folderID, list.id, { currentItem: nextItemId });
-  } else if (direction === "prev") {
-    const prevItemId = items[(currentItemIndex - 1 + items.length) % items.length].id;
-    // update list with previous item
-    list.currentItem = prevItemId;
-    console.log('[rotateTodayItemForList] updating list with previous item:', prevItemId);
-    // await updateList(list.id, { currentItem: prevItemId });
-    // Also update the librarylist
-    await updateLibraryList(userID, list.folderID, list.id, { currentItem: prevItemId });
+    newItemId = items[(currentItemIndex + 1) % items.length].id;
+  } else { // direction === "prev"
+    newItemId = items[(currentItemIndex - 1 + items.length) % items.length].id;
   }
+  
+  // Use a single database write transaction to update list
+  await database.write(async () => {
+    // Find the library list entry
+    const libraryList = await database.get<wLibraryList>('librarylists')
+      .query(
+        Q.where('owner_id', userID),
+        Q.where('folder_id', list.folderID),
+        Q.where('list_id', list.id)
+      )
+      .fetch();
+
+    if (libraryList.length === 0) {
+      console.log('[rotateTodayItemForList] FAILED TO FIND LIBRARY LIST:');
+      console.log('userID:', userID);
+      console.log('folderID:', list.folderID);
+      console.log('listID:', list.id);
+      throw new Error('LibraryList is not in user library');
+    }
+
+    // Update the library list with the new current item
+    await libraryList[0].update((raw: wLibraryList) => {
+      raw.current_item = newItemId;
+      raw.updated_at = new Date();
+    });
+    
+    // Update the list object
+    list.currentItem = newItemId;
+    console.log(`[rotateTodayItemForList] updated list with ${direction} item:`, newItemId);
+  });
+  
+  // Sync after updating the list
+  iMadeAChange();
 }
 
 export async function setTodayItemForList(listId: string, itemId: string) {
@@ -647,7 +685,7 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
     });
   });
   // Sync after user update
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function updateFolder(folderId: string, updates: Partial<Folder>): Promise<void> {
@@ -663,7 +701,7 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
     });
   });
   // Sync after folder update
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function updateList(listId: string, updates: Partial<List>): Promise<void> {
@@ -681,7 +719,7 @@ export async function updateList(listId: string, updates: Partial<List>): Promis
     });
   });
   // Sync after list update
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function updateItem(itemId: string, updates: Partial<Item>): Promise<void> {
@@ -699,7 +737,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>): Promis
     });
   });
   // Sync after item update
-  await syncUserData();
+  iMadeAChange();
 }
 
 type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
@@ -757,7 +795,7 @@ export async function deleteUser(userId: string): Promise<void> {
     await user[0].markAsDeleted();
   });
   // Sync after user deletion
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function deleteFolder(folderId: string): Promise<void> {
@@ -775,7 +813,7 @@ export async function deleteFolder(folderId: string): Promise<void> {
     (database as any).adapter.deletedRecords.folders.push(id2);
   });
   // Sync after folder deletion
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function deleteList(listId: string): Promise<void> {
@@ -831,7 +869,7 @@ export async function deleteList(listId: string): Promise<void> {
   });
 
   // Sync after list deletion
-  await syncUserData();
+  iMadeAChange();
 }
 // TODO: what if a user deletes an item from a list than another user has in library? What happens to currentItem? 
 // TODO: if last item, currentItem should be set to null, notifyOnNew should be set to false, today
@@ -857,7 +895,7 @@ export async function deleteItem(userID: string, itemId: string): Promise<void> 
   });
 
   // Sync after item deletion
-  await syncUserData();
+  iMadeAChange();
 }
 
 
@@ -878,7 +916,7 @@ export async function addItems(items: Item[]) {
     }
   });
   // Sync after adding items
-  await syncUserData();
+  iMadeAChange();
 }
 
 export async function getItemsInList(list: List): Promise<Item[]> {
@@ -948,7 +986,7 @@ export async function switchFolderOfList(ownerID: string, oldFolderID: string, n
       }
   });
   // Sync after moving list to folder
-  await syncUserData();
+  iMadeAChange();
 }
 
 // Used when user drags an item to a new position in the list
@@ -988,7 +1026,7 @@ export async function changeItemOrder(itemId: string, newOrderIndex: number) {
 
   });
   // Sync after changing item order
-  await syncUserData();
+  iMadeAChange();
 }
 
 

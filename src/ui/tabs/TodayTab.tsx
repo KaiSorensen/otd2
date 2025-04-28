@@ -97,27 +97,37 @@ const TodayScreen = () => {
 
   // Handle rotating all items
   const handleRotateAllItems = async () => {
-    if (!todayInfo || !currentUser) return;
+    if (!todayInfo || !currentUser || loadingLists) return;
+    
+    // Set loading state to prevent rapid button presses
+    setLoadingLists(true);
+    
+    try {
+      // Process lists one by one, awaiting each operation
+      for (const list of todayInfo.todayLists) {
+        await list.rotateTodayItem(currentUser.id, "next");
+      }
 
-    for (const list of todayInfo.todayLists) {
-      await list.rotateTodayItem(currentUser.id, "next");
+      // Refresh the today info
+      const lists = currentUser.getTodayLists();
+      const info = new TodayInfo(lists);
+      await info.refreshTodayItems();
+      setTodayInfo(info);
+
+      // Update the displayed item for the current list
+      const selectedList = info.todayLists[selectedListIndex];
+      if (selectedList) {
+        const item = info.getItemForList(selectedList.id);
+        setDisplayedItem(item);
+      }
+
+      // Force UI update
+      await forceUserUpdate();
+    } catch (error) {
+      console.error('Error rotating items:', error);
+    } finally {
+      setLoadingLists(false);
     }
-
-    // Refresh the today info
-    const lists = currentUser.getTodayLists();
-    const info = new TodayInfo(lists);
-    await info.refreshTodayItems();
-    setTodayInfo(info);
-
-    // Update the displayed item for the current list
-    const selectedList = info.todayLists[selectedListIndex];
-    if (selectedList) {
-      const item = info.getItemForList(selectedList.id);
-      setDisplayedItem(item);
-    }
-
-    // Force UI update
-    await forceUserUpdate();
   };
 
   // Scroll to center the selected chip
