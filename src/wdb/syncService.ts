@@ -1,7 +1,7 @@
 import { synchronize } from '@nozbe/watermelondb/sync';
 import { database } from '.';
 import { supabase } from '../supabase/supabase';
-import { iMadeAChange } from './pendingSyncService';
+import { iWantToSync } from './pendingSyncService';
 // Define the shape of the sync response
 interface SyncResponse {
   changes: {
@@ -443,7 +443,7 @@ export function setupSyncOnChanges() {
     }
     
     syncTimeout = setTimeout(() => {
-      iMadeAChange();
+      iWantToSync();
     }, 10000); // Increased debounce time to 10 seconds
   });
 }
@@ -456,7 +456,7 @@ export async function initializeSync() {
   setupSyncOnChanges();
   
   // Perform initial sync
-  await iMadeAChange();
+  await iWantToSync();
   
   // Set up Supabase realtime subscription for remote changes
   const subscription = supabase
@@ -472,7 +472,7 @@ export async function initializeSync() {
           clearTimeout(syncTimeout);
         }
         syncTimeout = setTimeout(() => {
-          iMadeAChange();
+          iWantToSync();
         }, 5000);
       }
     )

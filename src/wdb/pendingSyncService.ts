@@ -29,6 +29,6 @@ async function processSync() {
 }
 
 // Function to trigger a sync operation
-export function iMadeAChange() {
+export function iWantToSync() {
   processSync();
 } 
