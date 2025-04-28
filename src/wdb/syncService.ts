@@ -456,7 +456,7 @@ export async function initializeSync() {
   setupSyncOnChanges();
   
   // Perform initial sync
-  await iWantToSync();
+  iWantToSync();
   
   // Set up Supabase realtime subscription for remote changes
   const subscription = supabase
