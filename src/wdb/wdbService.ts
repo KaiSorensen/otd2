@@ -427,13 +427,10 @@ export async function populateSubFolders(folder: Folder) {
 
 // ======= SEARCH FUNCTIONS =======
 
-export async function getUserListsBySubstring(userID: string, substring: string): Promise<List[]> {
+export async function getLibraryListsBySubstring(substring: string): Promise<List[]> {
   const lists = await database.get<wList>('lists')
     .query(
-      Q.and(
-        Q.where('owner_id', userID),
-        Q.where('title', Q.like(substring))
-      )
+      Q.where('title', Q.like(`%${substring}%`))
     )
     .fetch();
 

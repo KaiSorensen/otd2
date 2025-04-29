@@ -15,7 +15,7 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
   getLibraryItemsBySubstring,
-  getUserListsBySubstring,
+  getLibraryListsBySubstring
 } from '../../wdb/wdbService';
 import {
   getPublicListsBySubstring,
@@ -120,7 +120,7 @@ const SearchScreen = () => {
       switch (filter) {
         case 'library':
           // Search only in local database (watermelondb)
-          const userLists = await getUserListsBySubstring(currentUser.id, term);
+          const userLists = await getLibraryListsBySubstring(term);
           const userItems = await getLibraryItemsBySubstring(currentUser, term);
 
           searchResults = [
@@ -131,9 +131,10 @@ const SearchScreen = () => {
 
         case 'lists':
           // Search in both local and remote databases
-          const localLists = await getUserListsBySubstring(currentUser.id, term);
+          const localLists = await getLibraryListsBySubstring(term);
           const publicLists = await getPublicListsBySubstring(term, isInternetReachable);
 
+          // filter out duplicates
           searchResults = [
             ...localLists.map((list: List) => ({ type: 'list' as const, data: list })),
             ...publicLists
@@ -156,11 +157,12 @@ const SearchScreen = () => {
 
         case null:
           // Search in both local and remote databases
-          const allLocalLists = await getUserListsBySubstring(currentUser.id, term);
+          const allLocalLists = await getLibraryListsBySubstring(term);
           const allLocalItems = await getLibraryItemsBySubstring(currentUser, term);
           const allPublicLists = await getPublicListsBySubstring(term, isInternetReachable);
           const allUsers = await getUsersBySubstring(term, isInternetReachable);
 
+          // filter out duplicates
           searchResults = [
             ...allLocalLists.map((list: List) => ({ type: 'list' as const, data: list })),
             ...allLocalItems.map((item: Item) => ({ type: 'item' as const, data: item })),
@@ -306,7 +308,7 @@ const SearchScreen = () => {
 
   // If a user is selected, show the UserScreen
   if (selectedUser) {
-    return <UserScreen user={selectedUser} onBack={handleBackFromUserScreen} />;
+    return <UserScreen userID={selectedUser.id} onBack={handleBackFromUserScreen} />;
   }
 
   // If a list is selected, show the ListScreen

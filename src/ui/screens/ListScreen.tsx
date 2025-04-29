@@ -594,13 +594,13 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       <ScrollView style={styles.scrollContent}>
         {/* List details section */}
         <View style={[styles.detailsSection, { borderBottomColor: colors.divider }]}>
-          <View style={styles.coverImageContainer}>
+          {/* <View style={styles.coverImageContainer}>
             {list.coverImageURL ? (
               <Image source={{ uri: list.coverImageURL }} style={styles.coverImage} />
             ) : (
               <View style={[styles.coverImagePlaceholder, { backgroundColor: colors.backgroundSecondary }]} />
             )}
-          </View>
+          </View> */}
           
           <View style={styles.listInfo}>
             <Text style={[styles.listTitle, { color: colors.textPrimary }]}>{list.title}</Text>
