@@ -27,6 +27,7 @@ import { useColors } from '../../contexts/ColorContext';
 import ItemScreen from './ItemScreen';
 import UserScreen from './UserScreen';
 import ListSettingsModal from '../components/ListSettingsModal';
+import ParserModal from '../components/ParserModal';
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -223,6 +224,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
   const [userFolders, setUserFolders] = useState<Folder[]>([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [listOwner, setListOwner] = useState<User | null>(null);
+  const [isParserModalVisible, setIsParserModalVisible] = useState(false);
 
   
   // Add useEffect to check if list is in library and use that version if it exists
@@ -342,25 +344,44 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
   const handleAddItem = async () => {
     if (!currentUser || currentUser.id !== list.ownerID) return;
 
-    const newItem = new Item(
-      uuidv4(),
-      list.id,
-      'New Item',
-      '',
-      [],
-      0,
-      new Date(),
-      new Date()
-    );
+    Alert.alert(
+      'Add Item',
+      'How would you like to add items?',
+      [
+        {
+          text: 'Single Item',
+          onPress: async () => {
+            const newItem = new Item(
+              uuidv4(),
+              list.id,
+              'New Item',
+              '',
+              [],
+              0,
+              new Date(),
+              new Date()
+            );
 
-    try {
-      await storeNewItem(newItem);
-      setItems([...items, newItem]);
-      setSelectedItem(newItem);
-    } catch (error) {
-      console.error('Error creating new item:', error);
-      Alert.alert('Error', 'Failed to create new item. Please try again.');
-    }
+            try {
+              await storeNewItem(newItem);
+              setItems([...items, newItem]);
+              setSelectedItem(newItem);
+            } catch (error) {
+              console.error('Error creating new item:', error);
+              Alert.alert('Error', 'Failed to create new item. Please try again.');
+            }
+          }
+        },
+        {
+          text: 'Use Parser',
+          onPress: () => setIsParserModalVisible(true)
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        }
+      ]
+    );
   };
 
   // Function to handle deleting an item
@@ -669,6 +690,16 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
         onClose={() => setIsAddToLibraryModalVisible(false)}
         onAdd={handleAddToLibrary}
         folders={userFolders}
+      />
+
+      {/* Parser Modal */}
+      <ParserModal
+        visible={isParserModalVisible}
+        onClose={() => {
+          setIsParserModalVisible(false);
+          fetchItems(); // Refresh items after parser is closed
+        }}
+        list={list}
       />
     </SafeAreaView>
   );

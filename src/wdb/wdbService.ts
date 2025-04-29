@@ -928,6 +928,8 @@ export async function addItems(items: Item[]) {
           raw.content = item.content ?? '';
           raw.image_urls = item.imageURLs ?? [];
           raw.order_index = item.orderIndex;
+          raw.created_at = item.createdAt;
+          raw.updated_at = item.updatedAt;
         });
       }
     });
