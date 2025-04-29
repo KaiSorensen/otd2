@@ -27,14 +27,9 @@ import { useColors } from '../../contexts/ColorContext';
 import ItemScreen from './ItemScreen';
 import UserScreen from './UserScreen';
 import ListSettingsModal from '../components/ListSettingsModal';
-import ParserModal from '../components/ParserModal';
 import { v4 as uuidv4 } from 'uuid';
 import ParserView from '../components/Parser';
 
-
-// TODO:
-// - switch folder of list should work
-// - add list to folder should work
 
 // Helper function to strip HTML tags for plain text display
 const stripHtml = (html: string): string => {

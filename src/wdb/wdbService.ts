@@ -151,104 +151,110 @@ export async function storeNewItem(item: Item) {
 // ======= SINGLE RETRIEVE FUNCTIONS =======
 
 export async function retrieveFolder(folderId: string, ownerID: string): Promise<Folder | null> {
-    try {
-      const data = await database.get<wFolder>('folders')
-        .query(
-          Q.where('id2', folderId),
-          Q.where('owner_id', ownerID)
-        )
-        .fetch();
+    return dbQueue.enqueue(async () => {
+        try {
+            const data = await database.get<wFolder>('folders')
+                .query(
+                    Q.where('id2', folderId),
+                    Q.where('owner_id', ownerID)
+                )
+                .fetch();
 
-      if (!data || data.length === 0) {
-        return null;
-      }
+            if (!data || data.length === 0) {
+                return null;
+            }
 
-      const folder = new Folder(
-        data[0].id2,
-        data[0].owner_id,
-        data[0].parent_folder_id,
-        data[0].name
-      );
+            const folder = new Folder(
+                data[0].id2,
+                data[0].owner_id,
+                data[0].parent_folder_id,
+                data[0].name
+            );
 
-      return folder;
-    } catch (error) {
-      console.error('Error retrieving folder:', error);
-      return null;
-    }
+            return folder;
+        } catch (error) {
+            console.error('Error retrieving folder:', error);
+            return null;
+        }
+    });
 }
 
 export async function retrieveList(listId: string): Promise<List | null> {
-    try {
-      const list = await database.get<wList>('lists')
-        .query(Q.where('id2', listId))
-        .fetch();
+    return dbQueue.enqueue(async () => {
+        try {
+            const list = await database.get<wList>('lists')
+                .query(Q.where('id2', listId))
+                .fetch();
 
-      if (!list || list.length === 0) {
-        return null;
-      }
+            if (!list || list.length === 0) {
+                return null;
+            }
 
-      // Get library configuration if it exists
-      const libraryList = await database.get<wLibraryList>('librarylists')
-        .query(
-          Q.where('list_id', listId)
-        )
-        .fetch();
+            // Get library configuration if it exists
+            const libraryList = await database.get<wLibraryList>('librarylists')
+                .query(
+                    Q.where('list_id', listId)
+                )
+                .fetch();
 
-      if (libraryList.length === 0) {
-        console.error('Library list not found');
-        return null;
-      }
+            if (libraryList.length === 0) {
+                console.error('Library list not found');
+                return null;
+            }
 
-      const liblist = new List(
-        list[0].id2,
-        list[0].owner_id,
-        list[0].title,
-        list[0].description,
-        list[0].cover_image_url,
-        list[0].is_public,
-        libraryList[0].folder_id,
-        libraryList[0].sort_order,
-        libraryList[0].today,
-        libraryList[0].current_item,
-        libraryList[0].notify_on_new,
-        libraryList[0].notify_time,
-        libraryList[0].notify_days,
-        libraryList[0].order_index
-      );
+            const liblist = new List(
+                list[0].id2,
+                list[0].owner_id,
+                list[0].title,
+                list[0].description,
+                list[0].cover_image_url,
+                list[0].is_public,
+                libraryList[0].folder_id,
+                libraryList[0].sort_order,
+                libraryList[0].today,
+                libraryList[0].current_item,
+                libraryList[0].notify_on_new,
+                libraryList[0].notify_time,
+                libraryList[0].notify_days,
+                libraryList[0].order_index
+            );
 
-      return liblist;
-    } catch (error) {
-      console.error('Error retrieving list:', error);
-      return null;
-    }
+            return liblist;
+        } catch (error) {
+            console.error('Error retrieving list:', error);
+            return null;
+        }
+    });
 }
 
 export async function retrieveItem(itemId: string): Promise<Item | null> {
-    try {
-      const data = await database.get<wItem>('items')
-        .query(Q.where('id2', itemId))
-        .fetch();
+    return dbQueue.enqueue(async () => {
+        try {
+            const data = await database.get<wItem>('items')
+                .query(Q.where('id2', itemId))
+                .fetch();
 
-      if (!data || data.length === 0) {
-        return null;
-      }
+            if (!data || data.length === 0) {
+                return null;
+            }
 
-      const item = new Item(
-        data[0].id2,
-        data[0].list_id,
-        data[0].title,
-        data[0].content,
-        data[0].image_urls,
-        data[0].order_index,
-        data[0].created_at,
-        data[0].updated_at
-      );
+            const item = new Item(
+                data[0].id2,
+                data[0].list_id,
+                data[0].title,
+                data[0].content,
+                data[0].image_urls,
+                data[0].order_index,
+                data[0].created_at,
+                data[0].updated_at
+            );
 
-      return item;
-    } catch (error) {
-      console.error('Error retrieving item:', error);
-      return null;
-    }
+            return item;
+        } catch (error) {
+            console.error('Error retrieving item:', error);
+            return null;
+        }
+    });
 }
 
 // ======= POPULATION FUNCTIONS =======
@@ -883,6 +889,7 @@ export async function deleteList(listId: string): Promise<void> {
 // TODO: what if a user deletes an item from a list than another user has in library? What happens to currentItem? 
 // TODO: if last item, currentItem should be set to null, notifyOnNew should be set to false, today
 // TODO: if first item, currentItem should be set to that item
+// TODO: this just copy-pastes the code from retrieveList in order to avoid a race condition with the queue
 export async function deleteItem(userID: string, itemId: string): Promise<void> {
   return dbQueue.enqueue(async () => {
     await database.write(async () => {
@@ -890,9 +897,45 @@ export async function deleteItem(userID: string, itemId: string): Promise<void> 
       if (!item || item.length === 0) {
         throw new Error('Item not found');
       }
-      const list = await retrieveList(item[0].list_id);
-      if (list?.currentItem === itemId) {
-        await rotateTodayItemForList(userID, list, "next");
+      const list = await database.get<wList>('lists')
+        .query(Q.where('id2', item[0].list_id))
+        .fetch();
+
+        if (!list || list.length === 0) {
+            return null;
+        }
+
+        // Get library configuration if it exists
+        const libraryList = await database.get<wLibraryList>('librarylists')
+            .query(
+                Q.where('list_id', item[0].list_id)
+            )
+            .fetch();
+
+        if (libraryList.length === 0) {
+            console.error('Library list not found');
+            return null;
+        }
+
+        const liblist = new List(
+            list[0].id2,
+            list[0].owner_id,
+            list[0].title,
+            list[0].description,
+            list[0].cover_image_url,
+            list[0].is_public,
+            libraryList[0].folder_id,
+            libraryList[0].sort_order,
+            libraryList[0].today,
+            libraryList[0].current_item,
+            libraryList[0].notify_on_new,
+            libraryList[0].notify_time,
+            libraryList[0].notify_days,
+            libraryList[0].order_index
+        );
+
+      if (liblist?.currentItem === itemId) {
+        await rotateTodayItemForList(userID, liblist, "next");
       }
       const id2 = item[0].id2;
       await item[0].markAsDeleted();
