@@ -304,51 +304,53 @@ const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => 
    * ------------------   RENDER   ------------------- *
    *****************************************************/
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Parser</Text>
-        <Pressable onPress={persist}>
-          <Text style={styles.headerIcon}>✔︎</Text>
-        </Pressable>
-      </View>
+    <Modal visible={visible} onRequestClose={onDismiss} animationType="slide">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.container}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Parser</Text>
+          <Pressable onPress={persist}>
+            <Text style={styles.headerIcon}>✔︎</Text>
+          </Pressable>
+        </View>
 
-      <ScrollView style={styles.body} keyboardDismissMode="interactive">
-        <TextInput
-          style={styles.input}
-          multiline
-          value={plainText}
-          onChangeText={onChangeText}
-          placeholder="Paste text here…"
-          selection={{ start: selection.location, end: selection.location + selection.length }}
-          onSelectionChange={onSelectionChange}
-        />
+        <ScrollView style={styles.body} keyboardDismissMode="interactive">
+          <TextInput
+            style={styles.input}
+            multiline
+            value={plainText}
+            onChangeText={onChangeText}
+            placeholder="Paste text here…"
+            selection={{ start: selection.location, end: selection.location + selection.length }}
+            onSelectionChange={onSelectionChange}
+          />
 
-        {/* PREVIEW */}
-        {highlightedPreview}
-      </ScrollView>
+          {/* PREVIEW */}
+          {highlightedPreview}
+        </ScrollView>
 
-      {/* ACTIONS */}
-      <View style={styles.actions}>
-        <Pressable style={styles.actionBtn} onPress={autoFill}>
-          <Text style={styles.actionTxt}>{autoFilled ? "Remove Auto‑Fill" : "Auto‑Fill"}</Text>
-        </Pressable>
-        <Pressable style={styles.actionBtn} onPress={cursorInBlue >= 0 ? removeBlue : highlightBlue}>
-          <Text style={styles.actionTxt}>{cursorInBlue >= 0 ? "Remove Blue" : "Blue"}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.actionBtn}
-          onPress={cursorInOrange >= 0 ? removeOrange : highlightOrange}
-        >
-          <Text style={styles.actionTxt}>{cursorInOrange >= 0 ? "Remove Orange" : "Orange"}</Text>
-        </Pressable>
-        <Pressable style={styles.closeBtn} onPress={onDismiss}>
-          <Text style={styles.actionTxt}>×</Text>
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+        {/* ACTIONS */}
+        <View style={styles.actions}>
+          <Pressable style={styles.actionBtn} onPress={autoFill}>
+            <Text style={styles.actionTxt}>{autoFilled ? "Remove Auto‑Fill" : "Auto‑Fill"}</Text>
+          </Pressable>
+          <Pressable style={styles.actionBtn} onPress={cursorInBlue >= 0 ? removeBlue : highlightBlue}>
+            <Text style={styles.actionTxt}>{cursorInBlue >= 0 ? "Remove Blue" : "Blue"}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.actionBtn}
+            onPress={cursorInOrange >= 0 ? removeOrange : highlightOrange}
+          >
+            <Text style={styles.actionTxt}>{cursorInOrange >= 0 ? "Remove Orange" : "Orange"}</Text>
+          </Pressable>
+          <Pressable style={styles.closeBtn} onPress={onDismiss}>
+            <Text style={styles.actionTxt}>×</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 };
 

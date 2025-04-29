@@ -151,7 +151,6 @@ export async function storeNewItem(item: Item) {
 // ======= SINGLE RETRIEVE FUNCTIONS =======
 
 export async function retrieveFolder(folderId: string, ownerID: string): Promise<Folder | null> {
-  return dbQueue.enqueue(async () => {
     try {
       const data = await database.get<wFolder>('folders')
         .query(
@@ -176,11 +175,9 @@ export async function retrieveFolder(folderId: string, ownerID: string): Promise
       console.error('Error retrieving folder:', error);
       return null;
     }
-  });
 }
 
 export async function retrieveList(listId: string): Promise<List | null> {
-  return dbQueue.enqueue(async () => {
     try {
       const list = await database.get<wList>('lists')
         .query(Q.where('id2', listId))
@@ -224,11 +221,9 @@ export async function retrieveList(listId: string): Promise<List | null> {
       console.error('Error retrieving list:', error);
       return null;
     }
-  });
 }
 
 export async function retrieveItem(itemId: string): Promise<Item | null> {
-  return dbQueue.enqueue(async () => {
     try {
       const data = await database.get<wItem>('items')
         .query(Q.where('id2', itemId))
@@ -254,7 +249,6 @@ export async function retrieveItem(itemId: string): Promise<Item | null> {
       console.error('Error retrieving item:', error);
       return null;
     }
-  });
 }
 
 // ======= POPULATION FUNCTIONS =======
