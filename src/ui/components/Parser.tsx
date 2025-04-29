@@ -257,6 +257,7 @@ const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => 
     }
     await addItems(items);
     onDismiss();
+    // Ensure the list is refreshed after dismissing the modal
   };
 
   /*****************************************************

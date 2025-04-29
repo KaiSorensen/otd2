@@ -29,6 +29,7 @@ import UserScreen from './UserScreen';
 import ListSettingsModal from '../components/ListSettingsModal';
 import ParserModal from '../components/ParserModal';
 import { v4 as uuidv4 } from 'uuid';
+import ParserView from '../components/Parser';
 
 
 // TODO:
@@ -388,29 +389,13 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
   const handleDeleteItem = async (item: Item) => {
     if (!currentUser || currentUser.id !== list.ownerID) return;
 
-    Alert.alert(
-      'Delete Item',
-      'Are you sure you want to delete this item?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteItem(currentUser.id, item.id);
-              setItems(items.filter(i => i.id !== item.id));
-            } catch (error) {
-              console.error('Error deleting item:', error);
-              Alert.alert('Error', 'Failed to delete item. Please try again.');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      await deleteItem(currentUser.id, item.id);
+      setItems(items.filter(i => i.id !== item.id));
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      Alert.alert('Error', 'Failed to delete item. Please try again.');
+    }
   };
 
   // Function to handle adding list to library
@@ -692,15 +677,17 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
         folders={userFolders}
       />
 
-      {/* Parser Modal */}
-      <ParserModal
-        visible={isParserModalVisible}
-        onClose={() => {
-          setIsParserModalVisible(false);
-          fetchItems(); // Refresh items after parser is closed
-        }}
-        list={list}
-      />
+      {/* Parser View */}
+      {isParserModalVisible && (
+        <ParserView
+          visible={isParserModalVisible}
+          onDismiss={() => {
+            setIsParserModalVisible(false);
+            fetchItems(); // Refresh items after parser is closed
+          }}
+          list={list}
+        />
+      )}
     </SafeAreaView>
   );
 };
