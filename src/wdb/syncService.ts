@@ -442,9 +442,7 @@ export function setupSyncOnChanges() {
       clearTimeout(syncTimeout);
     }
     
-    syncTimeout = setTimeout(() => {
-      iWantToSync();
-    }, 10000); // Increased debounce time to 10 seconds
+    iWantToSync();
   });
 }
 
@@ -471,9 +469,7 @@ export async function initializeSync() {
         if (syncTimeout) {
           clearTimeout(syncTimeout);
         }
-        syncTimeout = setTimeout(() => {
-          iWantToSync();
-        }, 5000);
+        iWantToSync();
       }
     )
     .subscribe();
