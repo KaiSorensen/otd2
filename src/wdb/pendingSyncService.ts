@@ -7,19 +7,19 @@ let isSyncing = false;
 
 // Function to process the sync with debounce and prevent concurrent writes
 async function processSync() {
-  console.log(`Sync call triggered at: ${new Date().toISOString()}`);
+  // // console.log(`Sync call triggered at: ${new Date().toISOString()}`);
   if (syncTimeout) clearTimeout(syncTimeout);
   syncTimeout = setTimeout(async () => {
     if (isSyncing) {
-      console.log('Sync already in progress, skipping this execution.');
+      // // console.log('Sync already in progress, skipping this execution.');
       return;
     }
-    console.log(`Executing sync at: ${new Date().toISOString()}`);
+    // // console.log(`Executing sync at: ${new Date().toISOString()}`);
     isSyncing = true;
     try {
-      console.log('Starting sync operation');
+      // // console.log('Starting sync operation');
       await syncUserData();
-      console.log('Sync operation completed successfully');
+      // // console.log('Sync operation completed successfully');
     } catch (error) {
       console.error('Sync operation failed:', error);
     } finally {

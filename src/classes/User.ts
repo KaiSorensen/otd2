@@ -97,7 +97,7 @@ export class User {
         this._listMap = data.listMap;
         this._todayInfo = new TodayInfo(this.getTodayLists());
 
-        console.log("refreshed user")
+        // // console.log("refreshed user")
     }
 
     public addRootFolder(folder: Folder) {
@@ -184,7 +184,7 @@ export class User {
     }
 
     public async switchFolderOfList(userID: string, list: List, newFolderId: string) {
-        console.log("[switchFolderOfList] switching folder of list", list.id, "to", newFolderId);
+        // // console.log("[switchFolderOfList] switching folder of list", list.id, "to", newFolderId);
 
         const foundList = this.getList(list.id);
         if (!foundList) {

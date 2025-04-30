@@ -21,7 +21,7 @@ export async function retrieveUser(userId: string): Promise<User | null> {
       return null;
     }
     if (data === null) {
-      console.log('User not found in database:', userId);
+      // // console.log('User not found in database:', userId);
       return null;
     }
     const user = new User(
@@ -57,7 +57,7 @@ export async function getUsersBySubstring(substring: string, isInternetReachable
     throw error;
   }
 
-  console.log('found ', data.length, ' matching users in supabase');
+  // // console.log('found ', data.length, ' matching users in supabase');
 
   return data.map((user) => new User(
     user.id, 
@@ -72,9 +72,9 @@ export async function getUsersBySubstring(substring: string, isInternetReachable
  * Search for public lists by substring in title
  */
 export async function getPublicListsBySubstring(substring: string, isInternetReachable: boolean): Promise<List[]> {
-  console.log('getting public lists by substring', substring);
+  // // console.log('getting public lists by substring', substring);
   // if (!isInternetReachable) return [];
-  console.log('isInternetReachable', isInternetReachable);
+  // // console.log('isInternetReachable', isInternetReachable);
 
   const { data, error } = await supabase
     .from('lists')
@@ -85,7 +85,7 @@ export async function getPublicListsBySubstring(substring: string, isInternetRea
     throw error;
   }
 
-  console.log('found ', data.length, ' matching public lists in supabase');
+  // // console.log('found ', data.length, ' matching public lists in supabase');
 
   return data.map((list) => new List(
     list.id, 
@@ -123,7 +123,7 @@ export async function getPublicListsByUser(userId: string, isInternetReachable: 
       throw error;
     }
 
-    console.log('found ', data.length, ' matching lists for user in supabase');
+    // // console.log('found ', data.length, ' matching lists for user in supabase');
 
     return data.map((list) => new List(
       list.id, 

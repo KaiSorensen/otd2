@@ -16,7 +16,6 @@ import { useAuth } from '../../contexts/UserContext';
 import { useColors } from '../../contexts/ColorContext';
 import { Folder } from '../../classes/Folder';
 import { List } from '../../classes/List';
-import { supabase } from '../../supabase/supabase';
 import Icon from 'react-native-vector-icons/Ionicons';
 import UserSettingsScreen from '../screens/UserSettingsScreen';
 import ListScreen from '../screens/ListScreen';

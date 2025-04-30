@@ -10,7 +10,7 @@ export class TodayInfo {
     constructor(
         todayLists: List[],
     ) {
-        console.log(`TodayInfo constructor called with ${todayLists.length} lists`);
+        // // console.log(`TodayInfo constructor called with ${todayLists.length} lists`);
         this._todayLists = todayLists;
         this._todayItems = new Map<string, Item | null>();
 
@@ -26,7 +26,7 @@ export class TodayInfo {
 
     //database functions
     public async refreshTodayItems() {
-        console.log(`Refreshing today items for ${this.todayLists.length} lists`);
+        // // console.log(`Refreshing today items for ${this.todayLists.length} lists`);
         const promises = this.todayLists.map(async (list) => {
             if (list.currentItem) {
                 try {
@@ -60,7 +60,7 @@ export class TodayInfo {
 
     public getItemForList(listID: string): Item | null {
         const item = this.todayItems.get(listID);
-        console.log(`Item for list ${listID}:`, item?.title);
+        // // console.log(`Item for list ${listID}:`, item?.title);
         return item || null;
     }
 

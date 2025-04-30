@@ -9,7 +9,7 @@ import { deleteAllData } from '../wdb/wdbService';
 // Create a new user with email and password
 export const registerWithEmail = async (email: string, password: string, username: string): Promise<User> => {
   try {
-    console.log('Registering user with email:', email);
+    // // console.log('Registering user with email:', email);
     
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -31,7 +31,7 @@ export const registerWithEmail = async (email: string, password: string, usernam
       throw new Error('Failed to create user account');
     }
     
-    console.log('User registered successfully with ID:', data.user.id);
+    // // console.log('User registered successfully with ID:', data.user.id);
     
     // Create a User object from the Supabase user
     const newUser = createUserFromSupabaseUser(data.user);
@@ -39,7 +39,7 @@ export const registerWithEmail = async (email: string, password: string, usernam
     try {
       // Store the new user in the database (this will create default data)
       await storeNewUser(newUser);
-      console.log('User data stored in wdb successfully');
+      // // console.log('User data stored in wdb successfully');
       
       // After storing the user and creating default data, retrieve the complete user data
       const completeUser = await retrievePopulatedUser(data.user.id);
@@ -87,7 +87,7 @@ export const loginWithEmail = async (email: string, password: string): Promise<U
 // Sign in with Google
 export const loginWithGoogle = async (): Promise<User> => {
   try {
-    console.log('Starting Google Sign-In process');
+    // // console.log('Starting Google Sign-In process');
 
     const googleConfig = {
       webClientId: Config.GOOGLE_WEB_CLIENT_ID,
@@ -95,14 +95,14 @@ export const loginWithGoogle = async (): Promise<User> => {
       offlineAccess: true,
       forceCodeForRefreshToken: true,
     };
-    console.log('GoogleSignin configuration:', googleConfig);
+    // // console.log('GoogleSignin configuration:', googleConfig);
 
     GoogleSignin.configure(googleConfig);
 
     // Check Play Services (for Android, but good to check)
     try {
       const hasPlayServices = await GoogleSignin.hasPlayServices();
-      console.log('Has Play Services:', hasPlayServices);
+      // // console.log('Has Play Services:', hasPlayServices);
     } catch (playServicesError) {
       console.error('Play Services check error:', playServicesError);
     }
@@ -111,7 +111,7 @@ export const loginWithGoogle = async (): Promise<User> => {
     try {
       const currentUser = await GoogleSignin.getCurrentUser();
       if (currentUser) {
-        console.log('User is already signed in with Google, signing out first');
+        // // console.log('User is already signed in with Google, signing out first');
         await GoogleSignin.signOut();
       }
     } catch (error) {
@@ -119,10 +119,10 @@ export const loginWithGoogle = async (): Promise<User> => {
       // Continue with sign-in process even if this check fails
     }
 
-    console.log('Requesting Google Sign-In');
+    // // console.log('Requesting Google Sign-In');
     try {
       const userInfo = (await GoogleSignin.signIn());
-      console.log('Google Sign-In successful, user info:', userInfo);
+      // // console.log('Google Sign-In successful, user info:', userInfo);
 
       // Access the ID token from the correct property
       const idToken = userInfo.data?.idToken;
@@ -138,7 +138,7 @@ export const loginWithGoogle = async (): Promise<User> => {
 
       if (error) throw error;
 
-      console.log('Supabase sign-in successful with Google credential');
+      // // console.log('Supabase sign-in successful with Google credential');
 
       // Try to retrieve the user first
       try {
@@ -146,11 +146,11 @@ export const loginWithGoogle = async (): Promise<User> => {
         
         // If user doesn't exist in database, create a new one
         if (existingUser === null) {
-          console.log('Creating new user document for:', data.user.id);
+          // // console.log('Creating new user document for:', data.user.id);
           const newUser = createUserFromSupabaseUser(data.user);
           try {
             await storeNewUser(newUser);
-            console.log('User data stored in wdb successfully');
+            // // console.log('User data stored in wdb successfully');
             
             // After storing the user and creating default data, retrieve the complete user data
             const completeUser = await retrievePopulatedUser(data.user.id);
@@ -167,7 +167,7 @@ export const loginWithGoogle = async (): Promise<User> => {
           }
         } else {
           // User exists, return their data
-          console.log('User found in database:', data.user.id);
+          // // console.log('User found in database:', data.user.id);
           return existingUser;
         }
       } catch (retrieveError) {
@@ -176,7 +176,7 @@ export const loginWithGoogle = async (): Promise<User> => {
         const newUser = createUserFromSupabaseUser(data.user);
         try {
           await storeNewUser(newUser);
-          console.log('User data stored in wdb successfully after retrieval error');
+          // // console.log('User data stored in wdb successfully after retrieval error');
           
           // After storing the user and creating default data, retrieve the complete user data
           const completeUser = await retrievePopulatedUser(data.user.id);
@@ -222,7 +222,7 @@ export const logout = async (): Promise<void> => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
 
-    console.log('User signed out successfully');
+    // // console.log('User signed out successfully');
     // The auth state change listener will automatically set the user to null
   } catch (error) {
     console.error('Error signing out:', error);
@@ -232,7 +232,7 @@ export const logout = async (): Promise<void> => {
 
 // Check if user document exists in Supabase
 export const checkUserExists = async (userId: string): Promise<boolean> => {
-  console.log(`Checking if user exists in Supabase: ${userId}`);
+  // // console.log(`Checking if user exists in Supabase: ${userId}`);
   try {
     const { data, error } = await supabase
       .from('users')
@@ -243,7 +243,7 @@ export const checkUserExists = async (userId: string): Promise<boolean> => {
     if (error && error.code !== 'PGRST116') throw error;
 
     const exists = !!data;
-    console.log(`User document exists: ${exists}`);
+    // // console.log(`User document exists: ${exists}`);
     return exists;
   } catch (error) {
     console.error('Error checking if user exists:', error);
@@ -295,19 +295,19 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
   return supabase.auth.onAuthStateChange(async (event, session) => {
     try {
       if (session?.user) {
-        console.log('Supabase user authenticated:', session.user.id);
+        // // console.log('Supabase user authenticated:', session.user.id);
 
         try {
           // Try to retrieve user first
           const existingUser = await retrievePopulatedUser(session.user.id);
           
           if (existingUser === null) {
-            console.log('User not found in database, creating new user document');
+            // // console.log('User not found in database, creating new user document');
             // User doesn't exist, create a new one
             const newUser = createUserFromSupabaseUser(session.user);
             try {
               await storeNewUser(newUser);
-              console.log('New user document created successfully');
+              // // console.log('New user document created successfully');
               
               // After storing the user and creating default data, retrieve the complete user data
               const completeUser = await retrievePopulatedUser(session.user.id);
@@ -324,7 +324,7 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
             }
           } else {
             // User exists, return their data
-            console.log('User found in database');
+            // // console.log('User found in database');
             callback(existingUser);
           }
         } catch (error) {
@@ -334,7 +334,7 @@ export const subscribeToAuthChanges = (callback: (user: User | null) => void) =>
           callback(fallbackUser);
         }
       } else {
-        console.log('No Supabase user, setting auth state to null');
+        // // console.log('No Supabase user, setting auth state to null');
         callback(null);
       }
     } catch (error) {
@@ -374,7 +374,7 @@ export const deleteUserAccount = async (): Promise<void> => {
     // Sign out after deletion
     await supabase.auth.signOut();
     
-    console.log('User account deleted successfully');
+    // // console.log('User account deleted successfully');
   } catch (error) {
     console.error('Error deleting user account:', error);
     throw error;

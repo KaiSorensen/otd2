@@ -6,9 +6,9 @@ import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Add debugging to see what's happening
-// console.log('Config values:', Config);
-// console.log('Supabase URL:', Config.SUPABASE_URL);
-// console.log('Supabase Anon Key:', Config.SUPABASE_ANON_KEY);
+// // // console.log('Config values:', Config);
+// // // console.log('Supabase URL:', Config.SUPABASE_URL);
+// // // console.log('Supabase Anon Key:', Config.SUPABASE_ANON_KEY);
 
 // Remove quotes from the environment variables if they exist
 const supabaseUrl = Config.SUPABASE_URL
@@ -19,7 +19,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase URL or Anon Key is missing from environment variables');
 }
 
-// console.log('Creating Supabase client...');
+// // // console.log('Creating Supabase client...');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -31,7 +31,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 
-// console.log('Supabase:', supabase);
+// // // console.log('Supabase:', supabase);
 
 // Tells Supabase Auth to continuously refresh the session automatically
 // if the app is in the foreground. When this is added, you will continue

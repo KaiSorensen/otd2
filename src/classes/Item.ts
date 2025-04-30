@@ -78,9 +78,9 @@ export class Item {
 
     // Method to save changes to the database
     async save(): Promise<void> {
-        console.log('Saving item:', this._id, this._title);
-        console.log('Content length:', this._content?.length || 0);
-        console.log('Content preview:', this._content?.substring(0, 100));
+        // // console.log('Saving item:', this._id, this._title);
+        // // console.log('Content length:', this._content?.length || 0);
+        // // console.log('Content preview:', this._content?.substring(0, 100));
         
         await updateItem(this._id, {
             title: this._title,

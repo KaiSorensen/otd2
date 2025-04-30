@@ -98,7 +98,7 @@ let isSyncing = false;
 export async function syncUserData() {
   // If already syncing, skip this sync
   if (isSyncing) {
-    console.log('Sync already in progress, skipping...');
+    // // console.log('Sync already in progress, skipping...');
     return false;
   }
 
@@ -109,7 +109,7 @@ export async function syncUserData() {
     await synchronize({
       database,
       pullChanges: async ({ lastPulledAt, schemaVersion, migration }) => {
-        // console.log("Pulling changes");
+        // // // console.log("Pulling changes");
         const changes: any = {};
         const timestamp = Date.now();
 
@@ -124,7 +124,7 @@ export async function syncUserData() {
           if (watermelonTable === 'users') {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.id) {
-              // console.log("user sessoin id: ", session.user.id)
+              // // // console.log("user sessoin id: ", session.user.id)
               query = query.eq('id', session.user.id);
             } else {
               // If no session, skip users table entirely
@@ -170,10 +170,10 @@ export async function syncUserData() {
           if (watermelonTable === 'librarylists') {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.id) {
-              // console.log("user sessoin id: ", session.user.id)
+              // // // console.log("user sessoin id: ", session.user.id)
               query = query.eq('ownerid', session.user.id);
             } else {
-              // console.log("no session, skipping librarylists table");
+              // // // console.log("no session, skipping librarylists table");
               continue;
             }
           }
@@ -206,7 +206,7 @@ export async function syncUserData() {
 
           if (error) throw error;
 
-          // console.log(`[syncService] Pulled data for table ${supabaseTable}:`, data);
+          // // // console.log(`[syncService] Pulled data for table ${supabaseTable}:`, data);
 
           if (!changes[watermelonTable]) {
             changes[watermelonTable] = {
@@ -229,7 +229,7 @@ export async function syncUserData() {
               }
               transformedRecord[watermelonField] = value;
             });
-            // console.log(`[syncService] Transformed record for ${watermelonTable}:`, transformedRecord);
+            // // // console.log(`[syncService] Transformed record for ${watermelonTable}:`, transformedRecord);
             // If the record was created after lastPulledAt, it's a new record
             if (new Date(record.createdat) > new Date(lastPulledAt || 0)) {
               changes[watermelonTable].created.push(transformedRecord);
@@ -239,7 +239,7 @@ export async function syncUserData() {
           });
         }
 
-        // console.log('[syncService] All pulled and transformed changes:', changes);
+        // // // console.log('[syncService] All pulled and transformed changes:', changes);
 
         // Cleanup duplicates after pulling changes
         // await cleanupDuplicateLibraryLists();
@@ -250,14 +250,14 @@ export async function syncUserData() {
         };
       },
       pushChanges: async ({ changes, lastPulledAt }: PushChanges) => {
-        // console.log("Pushing changes");
+        // // // console.log("Pushing changes");
         // For each table with changes, push to Supabase
         for (const [watermelonTable, tableChanges] of Object.entries(changes)) {
           const supabaseTable = tableNameMap[watermelonTable];
           
           // // Skip user deletions entirely
           // if (watermelonTable === 'users' && tableChanges.deleted.length > 0) {
-          // console.log('[syncService] Skipping user deletions for security');
+          // // // console.log('[syncService] Skipping user deletions for security');
           //   continue;
           // }
           
@@ -286,7 +286,7 @@ export async function syncUserData() {
               // }
               transformedRecord[supabaseField] = value;
             });
-            // console.log(`[syncService] Prepared record to upsert for ${supabaseTable}:`, transformedRecord);
+            // // // console.log(`[syncService] Prepared record to upsert for ${supabaseTable}:`, transformedRecord);
             return transformedRecord;
           });
 
@@ -315,7 +315,7 @@ export async function syncUserData() {
             }
           }
 
-          // console.log(`[syncService] All records to upsert for ${supabaseTable}:`, recordsToUpsert);
+          // // // console.log(`[syncService] All records to upsert for ${supabaseTable}:`, recordsToUpsert);
 
           if (recordsToUpsert.length > 0) {
             const { error } = await supabase
@@ -327,16 +327,16 @@ export async function syncUserData() {
 
           // Handle deleted records
           if (tableChanges.deleted.length > 0) {
-            // console.log(`[syncService] Deleting records from ${supabaseTable}:`, tableChanges.deleted);
+            // // // console.log(`[syncService] Deleting records from ${supabaseTable}:`, tableChanges.deleted);
             
             // Get the stored id2 values for the deleted records
             let storedDeletions: string[] = (database as any).adapter.deletedRecords?.[watermelonTable] || [];
-            // console.log(`[syncService] Stored deletions for ${watermelonTable}:`, storedDeletions);
+            // // // console.log(`[syncService] Stored deletions for ${watermelonTable}:`, storedDeletions);
             
             if (storedDeletions.length > 0) {
               // Skip user deletions entirely
               if (watermelonTable === 'users') {
-                // console.log('[syncService] Skipping user deletions for security');
+                // // // console.log('[syncService] Skipping user deletions for security');
                 return;
               }
 
@@ -416,7 +416,7 @@ export async function syncUserData() {
       log: logger,
     });
 
-    console.log('Sync completed successfully');
+    // // console.log('Sync completed successfully');
     return true;
   } catch (error) {
     console.error('Sync failed:', error);
@@ -516,9 +516,9 @@ export async function syncUserData() {
 //     if (delError) {
 //       console.error('[cleanupDuplicateLibraryLists] Error deleting duplicates:', delError);
 //     } else {
-//       console.log(`[cleanupDuplicateLibraryLists] Removed ${duplicates.length} duplicate librarylists entries.`);
+//       // // console.log(`[cleanupDuplicateLibraryLists] Removed ${duplicates.length} duplicate librarylists entries.`);
 //     }
 //   } else {
-//     console.log('[cleanupDuplicateLibraryLists] No duplicates found.');
+//     // // console.log('[cleanupDuplicateLibraryLists] No duplicates found.');
 //   }
 // } 

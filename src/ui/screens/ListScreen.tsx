@@ -269,11 +269,11 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
     try {
       // if the list is in our library, then we need to fetch the items from the library
       if (list.folderID) {
-        console.log("fetching items from library")
+        // // console.log("fetching items from library")
         const listItems = await local_getItemsInList(list);
         setItems(listItems);
       } else {
-        console.log("fetching items from remote")
+        // // console.log("fetching items from remote")
         // if the list is not in our library, then we need to fetch the items from the remote database
         const listItems = await remote_getItemsInList(list.id);
         setItems(listItems);
@@ -401,7 +401,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       await storeNewList(list, currentUser.id, folderId);
       if (currentUser.id !== list.ownerID) {
         await addItems(items); // if it's not in our library AND the user is not the owner, then we need to download the items
-        console.log("added remote items to library")
+        // // console.log("added remote items to library")
       }
       // Refresh the User to update the library UI
       await currentUser.refresh();

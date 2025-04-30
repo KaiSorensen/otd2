@@ -16,16 +16,16 @@ const HomeScreen = () => {
       
       try {
         setDbStatus('checking');
-        console.log('TestScreen: Testing database connection for user:', currentUser.id);
+        // // console.log('TestScreen: Testing database connection for user:', currentUser.id);
         
         // Test reading the user document using our retrieveUser function
         const userData = await retrieveUser(currentUser.id);
         
         if (userData) {
-          console.log('TestScreen: Successfully read user data:', userData);
+          // // console.log('TestScreen: Successfully read user data:', userData);
           setDbStatus('connected');
         } else {
-          console.log('TestScreen: User data not found');
+          // // console.log('TestScreen: User data not found');
           setDbStatus('error');
         }
       } catch (error) {

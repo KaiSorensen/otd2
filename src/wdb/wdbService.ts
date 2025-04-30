@@ -18,7 +18,7 @@ function scheduleSync() {
     clearTimeout(syncTimeout);
   }
   syncTimeout = setTimeout(() => {
-    console.log('[scheduleSync] Scheduling sync');
+    // console.log('[scheduleSync] Scheduling sync');
     iWantToSync();
     syncTimeout = null;
   }, 5000); // 100ms debounce, adjust as needed
@@ -47,11 +47,11 @@ function safeUUID() {
 
 export async function storeNewUser(user: User) {
   const idToUse = user.id || safeUUID();
-  console.log('[storeNewUser] Incoming user.id:', user.id, 'id2 to use:', idToUse);
+  // console.log('[storeNewUser] Incoming user.id:', user.id, 'id2 to use:', idToUse);
   // Check if user already exists
   const existing = await database.get<wUser>('users').query(Q.where('id2', idToUse)).fetch();
   if (existing.length > 0) {
-    console.log('[storeNewUser] User with id2 already exists, skipping creation:', idToUse);
+    // console.log('[storeNewUser] User with id2 already exists, skipping creation:', idToUse);
     return;
   }
   await database.write(async () => {
@@ -65,14 +65,14 @@ export async function storeNewUser(user: User) {
       raw.updated_at = new Date();
     });
   });
-  console.log('User stored in k;ajsdhfi;asufhf');
+  // console.log('User stored in k;ajsdhfi;asufhf');
   // Sync after user creation
-  console.log("SYNCING NEW USER KJAHIUOFDHIUOHUIOWRHGWV");
+  // console.log("SYNCING NEW USER KJAHIUOFDHIUOHUIOWRHGWV");
   scheduleSync();
 }
 
 export async function storeNewFolder(folder: Folder) {
-  console.log('[storeNewFolder] Incoming folder.id:', folder.id);
+  // console.log('[storeNewFolder] Incoming folder.id:', folder.id);
 
   await database.write(async () => {
     await database.get<wFolder>('folders').create(raw => {
@@ -89,7 +89,7 @@ export async function storeNewFolder(folder: Folder) {
 }
 
 export async function storeNewList(list: List, adderID: string, folderID: string) {
-  console.log('[storeNewList] Incoming list:', list.id);
+  // console.log('[STORE-NEW-LIST] Incoming list:', list.id);
 
   await database.write(async () => {
     await database.get<wList>('lists').create(raw => {
@@ -104,7 +104,7 @@ export async function storeNewList(list: List, adderID: string, folderID: string
     });
   });
 
-  console.log("[storeNewList] inserting library list", list.id);
+  // console.log("[storeNewList] inserting library list", list.id);
 
   await database.write(async () => {
     await database.get<wLibraryList>('librarylists').create(raw => {
@@ -135,7 +135,7 @@ export async function storeNewList(list: List, adderID: string, folderID: string
 }
 
 export async function storeNewItem(item: Item) {
-  console.log('[storeNewItem] Incoming item.id:', item.id);
+  // console.log('[storeNewItem] Incoming item.id:', item.id);
 
   await database.write(async () => {
     await database.get<wItem>('items').create(raw => {
@@ -268,7 +268,7 @@ export async function retrievePopulatedUser(userId: string): Promise<User | null
         return null;
       }
 
-      console.log('Retrieved user in watermelon with id:', data[0].id2);
+      // console.log('Retrieved user in watermelon with id:', data[0].id2);
 
       const user = new User(
         data[0].id2,
@@ -284,6 +284,7 @@ export async function retrievePopulatedUser(userId: string): Promise<User | null
         console.error('Error populating user library:', libraryError);
       }
 
+      // console.log('[retrievePopulatedUser] Populated user:', user.id, 'rootFolders:', user.rootFolders.map(f => f.id), 'listMap:', Array.from(user.listMap.keys()));
       return user;
     })
     .catch((error) => {
@@ -306,6 +307,7 @@ export async function populateLibrary(user: User) {
     console.error('Error populating user lists:', listsError);
     user.listMap = new Map();
   }
+  // console.log('[populateLibrary] User', user.id, 'rootFolders:', user.rootFolders.map(f => f.id), 'listMap:', Array.from(user.listMap.keys()));
 }
 
 export async function populateUserLists(user: User) {
@@ -313,6 +315,7 @@ export async function populateUserLists(user: User) {
     const libraryLists = await database.get<wLibraryList>('librarylists')
       .query(Q.where('owner_id', user.id))
       .fetch();
+    // console.log('[populateUserLists] Loaded libraryLists for user', user.id, ':', libraryLists.map(l => ({list_id: l.list_id, folder_id: l.folder_id})));
 
     const lists: List[] = [];
     for (const libraryEntry of libraryLists) {
@@ -343,6 +346,7 @@ export async function populateUserLists(user: User) {
       ));
     }
     user.listMap = new Map(lists.map((list) => [list.id, list]));
+    // console.log('[populateUserLists] user.listMap:', Array.from(user.listMap.keys()));
   } catch (error) {
     console.error('Unexpected error in populateUserLists:', error);
     user.listMap = new Map();
@@ -353,8 +357,8 @@ export async function populateFoldersListIDs(folder: Folder) {
   const libraryLists = await database.get<wLibraryList>('librarylists')
     .query(Q.where('folder_id', folder.id))
     .fetch();
-
   folder.listsIDs = libraryLists.map((entry) => entry.list_id);
+  // console.log('[populateFoldersListIDs] Folder', folder.id, 'listsIDs:', folder.listsIDs);
 }
 
 export async function populateFolders(user: User) {
@@ -374,6 +378,7 @@ export async function populateFolders(user: User) {
     ));
 
     user.rootFolders = folders;
+    // console.log('[populateFolders] User', user.id, 'rootFolders:', folders.map(f => f.id));
 
     for (const folder of user.rootFolders) {
       try {
@@ -397,26 +402,15 @@ export async function populateFolders(user: User) {
 
 export async function populateSubFolders(folder: Folder) {
   const subFolders = await database.get<wFolder>('folders')
-    .query(
-      Q.where('owner_id', folder.ownerID),
-      Q.where('parent_folder_id', folder.id)
-    )
+    .query(Q.where('parent_folder_id', folder.id))
     .fetch();
-
-  if (!subFolders.length) {
-    folder.subFolders = [];
-    return;
-  }
-
-  folder.subFolders = subFolders.map((folderData) =>
-    new Folder(
-      folderData.id2,
-      folderData.owner_id,
-      folderData.parent_folder_id,
-      folderData.name
-    )
-  );
-
+  folder.subFolders = subFolders.map((sub) => new Folder(
+    sub.id2,
+    sub.owner_id,
+    sub.parent_folder_id,
+    sub.name
+  ));
+  // console.log('[populateSubFolders] Folder', folder.id, 'subFolders:', folder.subFolders.map(f => f.id));
   for (const subFolder of folder.subFolders) {
     await populateFoldersListIDs(subFolder);
     await populateSubFolders(subFolder);
@@ -453,20 +447,20 @@ export async function getLibraryListsBySubstring(substring: string): Promise<Lis
 }
 
 export async function getLibraryItemsBySubstring(user: User, substring: string): Promise<Item[]> {
-  console.log('getting library items by substring:', substring);
-  console.log('user listMap size:', user.listMap.size);
+  // console.log('getting library items by substring:', substring);
+  // console.log('user listMap size:', user.listMap.size);
 
   const libraryListIDs = Array.from(user.listMap.keys());
-  console.log('library list IDs:', libraryListIDs);
+  // console.log('library list IDs:', libraryListIDs);
 
   if (!libraryListIDs.length) {
-    console.log('no library lists found');
+    // console.log('no library lists found');
     return [];
   }
 
   let items: Item[] = [];
   for (const listID of libraryListIDs) {
-    console.log('searching items in list:', listID);
+    // console.log('searching items in list:', listID);
     const listItems = await database.get<wItem>('items')
       .query(
         Q.and(
@@ -479,10 +473,10 @@ export async function getLibraryItemsBySubstring(user: User, substring: string):
       )
       .fetch();
 
-    console.log('found items in list:', listItems.length);
+    // console.log('found items in list:', listItems.length);
 
     items = items.concat(listItems.map((item) => {
-      console.log('mapping item:', item.id2, item.title);
+      // console.log('mapping item:', item.id2, item.title);
       return new Item(
         item.id2,
         item.list_id,
@@ -496,7 +490,7 @@ export async function getLibraryItemsBySubstring(user: User, substring: string):
     }));
   }
 
-  console.log('total items found:', items.length);
+  // console.log('total items found:', items.length);
   return items;
 }
 
@@ -585,7 +579,7 @@ export async function initializeTodayItem(list: List) {
 export async function rotateTodayItemsAllLists(user: User) {
   const todayLists = user.getTodayLists();
   if (!todayLists.length) {
-    console.log('no today lists found');
+    // console.log('no today lists found');
     return;
   }
 
@@ -602,23 +596,23 @@ export async function rotateTodayItemForList(userID: string, list: List, directi
   const items = await getItemsInList(list); // already sorted by sortOrder
 
   if (!items.length) {
-    console.log('[rotateTodayItemForList] no items found');
+    // console.log('[rotateTodayItemForList] no items found');
     list.currentItem = null;
-    await updateList(list.id, { currentItem: null });
+    await updateLibraryList(userID, list.folderID, list.id, { currentItem: null });
     return;
   }
   if (items.length === 1) {
-    console.log('[rotateTodayItemForList] only one item, no rotation needed');
+    // console.log('[rotateTodayItemForList] only one item, no rotation needed');
     return;
   }
 
   const currentItemId = list.currentItem;
   if (!currentItemId) {
-    console.log('[rotateTodayItemForList] no current item, THIS LOGICALLY SHOULD NOT HAPPEN, initializing item');
+    // console.log('[rotateTodayItemForList] no current item, THIS LOGICALLY SHOULD NOT HAPPEN, initializing item');
     await initializeTodayItem(list);
     return;
   }
-  console.log('[rotateTodayItemForList] current item id:', currentItemId);
+  // console.log('[rotateTodayItemForList] current item id:', currentItemId);
   
   // get index of current item
   const currentItemIndex = items.findIndex(item => item.id === currentItemId);
@@ -632,34 +626,7 @@ export async function rotateTodayItemForList(userID: string, list: List, directi
   }
   
   // Use a single database write transaction to update list
-  await database.write(async () => {
-    // Find the library list entry
-    const libraryList = await database.get<wLibraryList>('librarylists')
-      .query(
-        Q.where('owner_id', userID),
-        Q.where('folder_id', list.folderID),
-        Q.where('list_id', list.id)
-      )
-      .fetch();
-
-    if (libraryList.length === 0) {
-      console.log('[rotateTodayItemForList] FAILED TO FIND LIBRARY LIST:');
-      console.log('userID:', userID);
-      console.log('folderID:', list.folderID);
-      console.log('listID:', list.id);
-      throw new Error('LibraryList is not in user library');
-    }
-
-    // Update the library list with the new current item
-    await libraryList[0].update((raw: wLibraryList) => {
-      raw.current_item = newItemId;
-      raw.updated_at = new Date();
-    });
-    
-    // Update the list object
-    list.currentItem = newItemId;
-    console.log(`[rotateTodayItemForList] updated list with ${direction} item:`, newItemId);
-  });
+  await updateLibraryList(userID, list.folderID, list.id, { currentItem: newItemId });
   
   // Sync after updating the list
   scheduleSync();
@@ -754,6 +721,7 @@ export async function updateLibraryList(ownerID: string, folderID: string, listI
   notifyDays?: DayOfWeek | null;
   orderIndex?: number;
 }): Promise<void> {
+  console.log('[updateLibraryList] Updating library list:', listID);
   await database.write(async () => {
     const libraryList = await database.get<wLibraryList>('librarylists')
       .query(
@@ -766,10 +734,10 @@ export async function updateLibraryList(ownerID: string, folderID: string, listI
 
 
     if (libraryList.length === 0) {
-      console.log('FAILED TO FIND LIBRARY LIST:');
-      console.log('ownerID:', ownerID);
-      console.log('folderID:', folderID);
-      console.log('listID:', listID);
+      // console.log('FAILED TO FIND LIBRARY LIST:');
+      // console.log('ownerID:', ownerID);
+      // console.log('folderID:', folderID);
+      // console.log('listID:', listID);
       throw new Error('LibraryList is not in user library');
     }
 
@@ -819,10 +787,10 @@ export async function deleteFolder(folderId: string): Promise<void> {
 }
 
 export async function deleteList(listId: string): Promise<void> {
-  console.log('[deleteList] Starting to delete list:', listId);
+  // console.log('[deleteList] Starting to delete list:', listId);
 
   // First delete from librarylists
-  console.log('[deleteList] Removing list config from library');
+  // console.log('[deleteList] Removing list config from library');
   await database.write(async () => {
     const libraryList = await database.get<wLibraryList>('librarylists').query(Q.where('list_id', listId)).fetch();
     if (libraryList.length) {
@@ -837,7 +805,7 @@ export async function deleteList(listId: string): Promise<void> {
 
   try {
     // Then delete from lists table
-    console.log('[deleteList] Removing list from lists table');
+    // console.log('[deleteList] Removing list from lists table');
     await database.write(async () => {
       const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
       if (!list || list.length === 0) {
@@ -851,11 +819,11 @@ export async function deleteList(listId: string): Promise<void> {
       (database as any).adapter.deletedRecords.lists.push(id2);
     });
   } catch (error) {
-    console.log('[deleteList] list was ALREADY GONE. WHERE DID IT GO..??:');
+    // console.log('[deleteList] list was ALREADY GONE. WHERE DID IT GO..??:');
   }
 
   // Finally remove items belonging to list from library
-  console.log('[deleteList] Removing items from library');
+  // console.log('[deleteList] Removing items from library');
   await database.write(async () => {
     const items = await database.get<wItem>('items').query(Q.where('list_id', listId)).fetch();
     if (items.length) {
@@ -975,11 +943,11 @@ export async function switchFolderOfList(ownerID: string, oldFolderID: string, n
       .fetch();
 
     if (libraryList.length === 0) {
-      console.log('[switchFolderOfList] FAILED TO FIND LIBRARY LIST:');
-      console.log('ownerID:', ownerID);
-      console.log('old folderID:', oldFolderID);
-      console.log('new folderID:', newFolderID);
-      console.log('listID:', listID);
+      // console.log('[switchFolderOfList] FAILED TO FIND LIBRARY LIST:');
+      // console.log('ownerID:', ownerID);
+      // console.log('old folderID:', oldFolderID);
+      // console.log('new folderID:', newFolderID);
+      // console.log('listID:', listID);
       throw new Error('LibraryList is not in user library');
     }
     if (libraryList.length) {
@@ -1040,7 +1008,7 @@ export async function deleteAllData(): Promise<void> {
   await database.write(async () => {
     // Use unsafeResetDatabase to truly drop all data without emitting delete events
     await database.adapter.unsafeResetDatabase();
-    console.log('All wdb data deleted.');
+    // console.log('All wdb data deleted.');
   });
   // No need to sync after deleting all data
   // When this is called, a different function will be called to delete all data from supabase

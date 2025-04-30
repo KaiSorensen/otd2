@@ -36,9 +36,9 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false }
 
   // Log item content for debugging
   useEffect(() => {
-    console.log('Item content:', item.id, item.title);
-    console.log('Content length:', item.content?.length || 0);
-    console.log('Content preview:', item.content?.substring(0, 100));
+    // // console.log('Item content:', item.id, item.title);
+    // // console.log('Content length:', item.content?.length || 0);
+    // // console.log('Content preview:', item.content?.substring(0, 100));
   }, []);
 
   // Update state when item prop changes

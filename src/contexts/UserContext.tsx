@@ -69,9 +69,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    console.log('Setting up auth subscription');
+    // // console.log('Setting up auth subscription');
     const subscription = subscribeToAuthChanges((user) => {
-      console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+      // // console.log('Auth state changed:', user ? 'User logged in' : 'No user');
       setCurrentUser(user);
       setLoading(false);
     });
@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  console.log('Auth state:', { currentUser, loading });
+  // // console.log('Auth state:', { currentUser, loading });
 
   const value = {
     currentUser,

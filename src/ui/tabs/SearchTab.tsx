@@ -226,12 +226,12 @@ const SearchScreen = () => {
   );
 
   const renderItemResult = (item: Item) => {
-    console.log('Rendering item:', item.id, item.title, item.content?.substring(0, 50));
+    // // console.log('Rendering item:', item.id, item.title, item.content?.substring(0, 50));
     return (
       <TouchableOpacity
         style={[styles.resultItem, { backgroundColor: colors.card, shadowColor: colors.shadow }]}
         onPress={() => {
-          console.log('Item pressed:', item.id);
+          // // console.log('Item pressed:', item.id);
           setSelectedItem(item);
         }}
       >
@@ -248,7 +248,7 @@ const SearchScreen = () => {
           style={styles.actionButton}
           onPress={(e) => {
             e.stopPropagation(); // Prevent triggering the parent onPress
-            console.log('Item arrow pressed:', item.id);
+            // // console.log('Item arrow pressed:', item.id);
             setSelectedItem(item);
           }}
         >
@@ -318,12 +318,12 @@ const SearchScreen = () => {
 
   // If an item is selected, show the ItemScreen
   if (selectedItem) {
-    console.log('Showing ItemScreen for item:', selectedItem.id);
+    // // console.log('Showing ItemScreen for item:', selectedItem.id);
     return (
       <ItemScreen
         item={selectedItem}
         onBack={() => {
-          console.log('Back from ItemScreen');
+          // // console.log('Back from ItemScreen');
           setSelectedItem(null);
         }}
       />
