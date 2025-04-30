@@ -863,15 +863,16 @@ export async function deleteList(listId: string): Promise<void> {
 // TODO: if last item, currentItem should be set to null, notifyOnNew should be set to false, today
 // TODO: if first item, currentItem should be set to that item
 export async function deleteItem(userID: string, itemId: string): Promise<void> {
+  // Fetch the item and list outside the write block
+  const item = await database.get<wItem>('items').query(Q.where('id2', itemId)).fetch();
+  if (!item || item.length === 0) {
+    throw new Error('Item not found');
+  }
+  const list = await retrieveList(item[0].list_id);
+  const shouldRotate = list?.currentItem === itemId;
+
+  // Do the deletion in the write block
   await database.write(async () => {
-    const item = await database.get<wItem>('items').query(Q.where('id2', itemId)).fetch();
-    if (!item || item.length === 0) {
-      throw new Error('Item not found');
-    }
-    const list = await retrieveList(item[0].list_id);
-    if (list?.currentItem === itemId) {
-      await rotateTodayItemForList(userID, list, "next");
-    }
     const id2 = item[0].id2;
     await item[0].markAsDeleted();
     // Add the id2 to the deleted array in the changes object
@@ -879,6 +880,11 @@ export async function deleteItem(userID: string, itemId: string): Promise<void> 
     (database as any).adapter.deletedRecords.items = (database as any).adapter.deletedRecords.items || [];
     (database as any).adapter.deletedRecords.items.push(id2);
   });
+
+  // Now, outside the write block, rotate if needed
+  if (shouldRotate && list) {
+    await rotateTodayItemForList(userID, list, "next");
+  }
 
   // Sync after item deletion
   iWantToSync();
