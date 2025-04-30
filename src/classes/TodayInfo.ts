@@ -44,6 +44,16 @@ export class TodayInfo {
     }
 
     public async updateTodayLists(lists: List[]) {
+        // if two lists have the same id, the last one will overwrite the first one, and we will log this.
+       
+        // remove duplicates from lists, log that we found duplicates
+        const duplicates = lists.filter((list, index, self) =>
+            index !== self.findIndex((t) => t.id === list.id)
+        );
+        if (duplicates.length > 0) {
+            console.error(`Found ${duplicates.length} duplicates in updateTodayLists`);
+        }
+
         this.todayLists = lists;
         await this.refreshTodayItems();
     }

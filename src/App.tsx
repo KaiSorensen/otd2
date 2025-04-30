@@ -10,7 +10,7 @@ import { NetworkProvider } from './contexts/NetworkContext';
 import MainNavigator from './ui/tabs/MainNavigator';
 import LoginScreen from './ui/login/LoginScreen';
 import RegisterScreen from './ui/login/RegisterScreen';
-import { initializeSync } from './wdb/syncService';
+// import { initializeSync } from './wdb/syncService';
 // import LoadingScreen from './ui/Login/LoadingScreen';
 
 const Stack = createNativeStackNavigator();
@@ -21,7 +21,7 @@ const AppContent = () => {
   // Initialize sync when the user is logged in
   useEffect(() => {
     if (currentUser) {
-      initializeSync();
+      // initializeSync();
     }
   }, [currentUser]);
 

@@ -241,6 +241,9 @@ export async function syncUserData() {
 
         // console.log('[syncService] All pulled and transformed changes:', changes);
 
+        // Cleanup duplicates after pulling changes
+        // await cleanupDuplicateLibraryLists();
+
         return {
           changes,
           timestamp
@@ -405,6 +408,9 @@ export async function syncUserData() {
             }
           }
         }
+
+        // Cleanup duplicates after pushing changes
+        // await cleanupDuplicateLibraryLists();
       },
       migrationsEnabledAtVersion: 1,
       log: logger,
@@ -420,59 +426,99 @@ export async function syncUserData() {
   }
 }
 
-// Helper function to check for unsynced changes
-export async function hasUnsyncedChanges() {
-  const { hasUnsyncedChanges } = await import('@nozbe/watermelondb/sync');
-  return hasUnsyncedChanges({ database });
-}
+// // Helper function to check for unsynced changes
+// export async function hasUnsyncedChanges() {
+//   const { hasUnsyncedChanges } = await import('@nozbe/watermelondb/sync');
+//   return hasUnsyncedChanges({ database });
+// }
 
-// Helper function to set up sync on changes
-export function setupSyncOnChanges() {
-  let syncTimeout: NodeJS.Timeout | null = null;
+// // Helper function to set up sync on changes
+// export function setupSyncOnChanges() {
+//   let syncTimeout: NodeJS.Timeout | null = null;
   
-  const tables = ['users', 'folders', 'lists', 'items', 'librarylists'];
-  const changes = database.withChangesForTables(tables);
+//   const tables = ['users', 'folders', 'lists', 'items', 'librarylists'];
+//   const changes = database.withChangesForTables(tables);
   
-  changes.subscribe(() => {
-    // Don't schedule a new sync if one is already in progress
-    if (isSyncing) return;
+//   changes.subscribe(() => {
+//     // Don't schedule a new sync if one is already in progress
+//     if (isSyncing) return;
     
-    // Debounce sync calls to avoid too frequent syncing
-    if (syncTimeout) {
-      clearTimeout(syncTimeout);
-    }
+//     // Debounce sync calls to avoid too frequent syncing
+//     if (syncTimeout) {
+//       clearTimeout(syncTimeout);
+//     }
     
-    iWantToSync();
-  });
-}
+//     iWantToSync();
+//   });
+// }
 
 // Initialize sync when app starts
-export async function initializeSync() {
-  let syncTimeout: NodeJS.Timeout | null = null;
+// export async function initializeSync() {
+//   let syncTimeout: NodeJS.Timeout | null = null;
   
-  // Set up change listeners
-  setupSyncOnChanges();
+//   // Set up change listeners
+//   // setupSyncOnChanges();
   
-  // Perform initial sync
-  iWantToSync();
+//   // Perform initial sync
+//   iWantToSync();
   
-  // Set up Supabase realtime subscription for remote changes
-  const subscription = supabase
-    .channel('sync-changes')
-    .on('postgres_changes', 
-      { 
-        event: '*', 
-        schema: 'public'
-      }, 
-      async () => {
-        // Debounce remote changes to avoid rapid resyncs
-        if (syncTimeout) {
-          clearTimeout(syncTimeout);
-        }
-        iWantToSync();
-      }
-    )
-    .subscribe();
+//   // Set up Supabase realtime subscription for remote changes
+//   const subscription = supabase
+//     .channel('sync-changes')
+//     .on('postgres_changes', 
+//       { 
+//         event: '*', 
+//         schema: 'public'
+//       }, 
+//       async () => {
+//         // Debounce remote changes to avoid rapid resyncs
+//         if (syncTimeout) {
+//           clearTimeout(syncTimeout);
+//         }
+//         iWantToSync();
+//       }
+//     )
+//     .subscribe();
     
-  return subscription;
-} 
+//   return subscription;
+// }
+
+// // Cleanup function to remove duplicate librarylists
+// export async function cleanupDuplicateLibraryLists() {
+//   // Fetch all librarylists
+//   const { data: allLibraryLists, error } = await supabase
+//     .from('librarylists')
+//     .select('*');
+//   if (error) {
+//     console.error('[cleanupDuplicateLibraryLists] Error fetching librarylists:', error);
+//     return;
+//   }
+//   if (!allLibraryLists) return;
+
+//   // Group by (ownerid, folderid, listid)
+//   const seen = new Map();
+//   const duplicates = [];
+//   for (const entry of allLibraryLists) {
+//     const key = `${entry.ownerid}|${entry.folderid}|${entry.listid}`;
+//     if (seen.has(key)) {
+//       duplicates.push(entry.id);
+//     } else {
+//       seen.set(key, entry.id);
+//     }
+//   }
+
+//   if (duplicates.length > 0) {
+//     // Remove all duplicates
+//     const { error: delError } = await supabase
+//       .from('librarylists')
+//       .delete()
+//       .in('id', duplicates);
+//     if (delError) {
+//       console.error('[cleanupDuplicateLibraryLists] Error deleting duplicates:', delError);
+//     } else {
+//       console.log(`[cleanupDuplicateLibraryLists] Removed ${duplicates.length} duplicate librarylists entries.`);
+//     }
+//   } else {
+//     console.log('[cleanupDuplicateLibraryLists] No duplicates found.');
+//   }
+// } 

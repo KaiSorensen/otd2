@@ -170,7 +170,9 @@ export class User {
     }
 
     public getTodayLists() {
-        return Array.from(this._listMap.values()).filter(l => l.today);
+        const seen = new Set<string>();
+        return Array.from(this._listMap.values())
+          .filter(l => l.today && !seen.has(l.id) && seen.add(l.id));
     }
 
     public getPublicLists() {

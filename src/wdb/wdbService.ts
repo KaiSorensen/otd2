@@ -11,6 +11,19 @@ import { iWantToSync } from './pendingSyncService';
 // Create a singleton instance of QueueService for database operations
 const dbQueue = new QueueService<any>();
 
+// Debounced sync trigger
+let syncTimeout: NodeJS.Timeout | null = null;
+function scheduleSync() {
+  if (syncTimeout) {
+    clearTimeout(syncTimeout);
+  }
+  syncTimeout = setTimeout(() => {
+    console.log('[scheduleSync] Scheduling sync');
+    iWantToSync();
+    syncTimeout = null;
+  }, 5000); // 100ms debounce, adjust as needed
+}
+
 // Fallback UUID generator in case the standard one fails
 function generateFallbackUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -55,7 +68,7 @@ export async function storeNewUser(user: User) {
   console.log('User stored in k;ajsdhfi;asufhf');
   // Sync after user creation
   console.log("SYNCING NEW USER KJAHIUOFDHIUOHUIOWRHGWV");
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function storeNewFolder(folder: Folder) {
@@ -72,7 +85,7 @@ export async function storeNewFolder(folder: Folder) {
     });
   });
   // Sync after folder creation
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function storeNewList(list: List, adderID: string, folderID: string) {
@@ -118,7 +131,7 @@ export async function storeNewList(list: List, adderID: string, folderID: string
     });
   });
   // Sync after list creation
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function storeNewItem(item: Item) {
@@ -137,7 +150,7 @@ export async function storeNewItem(item: Item) {
     });
   });
   // Sync after item creation
-  iWantToSync();
+  scheduleSync();
 }
 
 // ======= SINGLE RETRIEVE FUNCTIONS =======
@@ -649,7 +662,7 @@ export async function rotateTodayItemForList(userID: string, list: List, directi
   });
   
   // Sync after updating the list
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function setTodayItemForList(listId: string, itemId: string) {
@@ -673,7 +686,7 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
     });
   });
   // Sync after user update
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function updateFolder(folderId: string, updates: Partial<Folder>): Promise<void> {
@@ -689,10 +702,11 @@ export async function updateFolder(folderId: string, updates: Partial<Folder>): 
     });
   });
   // Sync after folder update
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function updateList(listId: string, updates: Partial<List>): Promise<void> {
+  console.log('[updateList] Updating list:', listId); 
   await database.write(async () => {
     const list = await database.get<wList>('lists').query(Q.where('id2', listId)).fetch();
     if (!list || list.length === 0) {
@@ -707,7 +721,7 @@ export async function updateList(listId: string, updates: Partial<List>): Promis
     });
   });
   // Sync after list update
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function updateItem(itemId: string, updates: Partial<Item>): Promise<void> {
@@ -725,7 +739,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>): Promis
     });
   });
   // Sync after item update
-  iWantToSync();
+  scheduleSync();
 }
 
 type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
@@ -783,7 +797,7 @@ export async function deleteUser(userId: string): Promise<void> {
     await user[0].markAsDeleted();
   });
   // Sync after user deletion
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function deleteFolder(folderId: string): Promise<void> {
@@ -801,7 +815,7 @@ export async function deleteFolder(folderId: string): Promise<void> {
     (database as any).adapter.deletedRecords.folders.push(id2);
   });
   // Sync after folder deletion
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function deleteList(listId: string): Promise<void> {
@@ -857,7 +871,7 @@ export async function deleteList(listId: string): Promise<void> {
   });
 
   // Sync after list deletion
-  iWantToSync();
+  scheduleSync();
 }
 // TODO: what if a user deletes an item from a list than another user has in library? What happens to currentItem? 
 // TODO: if last item, currentItem should be set to null, notifyOnNew should be set to false, today
@@ -887,7 +901,7 @@ export async function deleteItem(userID: string, itemId: string): Promise<void> 
   }
 
   // Sync after item deletion
-  iWantToSync();
+  scheduleSync();
 }
 
 
@@ -910,7 +924,7 @@ export async function addItems(items: Item[]) {
     }
   });
   // Sync after adding items
-  iWantToSync();
+  scheduleSync();
 }
 
 export async function getItemsInList(list: List): Promise<Item[]> {
@@ -977,7 +991,7 @@ export async function switchFolderOfList(ownerID: string, oldFolderID: string, n
     }
   });
   // Sync after moving list to folder
-  iWantToSync();
+  scheduleSync();
 }
 
 // Used when user drags an item to a new position in the list
@@ -1016,7 +1030,7 @@ export async function changeItemOrder(itemId: string, newOrderIndex: number) {
     }
   });
   // Sync after changing item order
-  iWantToSync();
+  scheduleSync();
 }
 
 
@@ -1033,7 +1047,7 @@ export async function deleteAllData(): Promise<void> {
 }
 
 // ======= QUEUE FUNCTIONS =======
-
+// this is a wicked function that I couldn't dream of writing myself, thanks GPT-4.1
 function queueWrap<T extends (...args: any[]) => Promise<any>>(fn: T): T {
   return (async function(this: any, ...args: any[]) {
     return dbQueue.enqueue(() => fn.apply(this, args));
