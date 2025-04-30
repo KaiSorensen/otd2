@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Modal,
   View,
@@ -15,7 +15,7 @@ import {
 import { addItems } from "../../wdb/wdbService";
 import { List } from "../../classes/List";
 import { Item } from "../../classes/Item";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * A lightweight replacement for NSRange
@@ -31,7 +31,7 @@ export type ParserViewProps = {
    */
   visible: boolean;
   /**
-   * Callback invoked when the user taps the \u2715 or the OS back‑gesture.
+   * Callback invoked when the user taps the × or the OS back‑gesture.
    */
   onDismiss: () => void;
   /**
@@ -40,64 +40,55 @@ export type ParserViewProps = {
   list: List;
 };
 
-/** ************************************************** ***
- *                 PARSER VIEW (REACT)                *
- **************************************************** */
+/**
+ * A simplified parser that produces content‑only Items.
+ * — No title handling
+ * — Single highlight colour (blue)
+ * — Optional auto‑fill that splits on blank lines
+ */
 const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => {
   /*****************************************************
    * -------------------- STATE ---------------------- *
    *****************************************************/
   const [plainText, setPlainText] = useState<string>("");
-  /** Currently selected range inside the <TextInput>. */
+  /** Current selection range inside the <TextInput>. */
   const [selection, setSelection] = useState<Range>({ location: 0, length: 0 });
-  /** Title‑segments (orange in the legacy SwiftUI view). */
-  const [oranges, setOranges] = useState<Range[]>([]);
-  /** Body‑segments (blue in the legacy SwiftUI view). */
-  const [blues, setBlues] = useState<Range[]>([]);
-  /** When TRUE the auto‑fill pass has generated a new set of highlights. */
+  /** User‑selected (or auto‑generated) segments to convert into Items. */
+  const [segments, setSegments] = useState<Range[]>([]);
+  /** Toggles whether the current highlight set came from auto‑fill. */
   const [autoFilled, setAutoFilled] = useState<boolean>(false);
 
-  /*  ----------------------------------------------------
-      highlight helpers
-      ---------------------------------------------------- */
+  /*****************************************************
+   * ----------------- UTILITIES --------------------- *
+   *****************************************************/
+  /** Does the cursor sit inside *any* of the provided ranges? Returns index or −1. */
   const cursorInRanges = useCallback(
-    (rs: Range[]): number => {
-      return rs.findIndex(
+    (rs: Range[]): number =>
+      rs.findIndex(
         r => selection.location >= r.location && selection.location <= r.location + r.length,
-      );
-    },
+      ),
     [selection],
   );
-  const cursorInOrange = cursorInRanges(oranges);
-  const cursorInBlue = cursorInRanges(blues);
+  const cursorInSegment = cursorInRanges(segments);
 
-  /**
-   * Replace or append a range helper (ensures immutability & deduplication).
-   */
+  /** Insert or replace a range, collapsing overlaps & adjacencies. */
   const upsertRange = (ranges: Range[], next: Range): Range[] => {
-    /** Remove overlaps and touching‑adjacent ranges – mimic the Swift helper. */
     const overlap = (a: Range, b: Range) => {
       const aEnd = a.location + a.length;
       const bEnd = b.location + b.length;
       if (aEnd === b.location || bEnd === a.location) return 0; // touching
       return Math.max(0, Math.min(aEnd, bEnd) - Math.max(a.location, b.location));
     };
-
     const filtered = ranges.filter(r => overlap(r, next) <= 0);
     return [...filtered, next].sort((a, b) => a.location - b.location);
   };
 
-  /*  ----------------------------------------------------
-      text‑change bookkeeping                (MUCH SIMPLER)
-      ---------------------------------------------------- */
+  /*****************************************************
+   * ---------------- TEXT INPUT --------------------- *
+   *****************************************************/
   const onChangeText = (t: string) => {
     setPlainText(t);
-    // 📝 In the SwiftUI version there is heavy bookkeeping to offset ranges on
-    // every keystroke.  React‑Native's TextInput does not expose enough low‑
-    // level cursor information *synchronously* to replicate that exactly.
-    // For the first pass we simply *reset* highlighting when the text mutates.
-    setBlues([]);
-    setOranges([]);
+    setSegments([]);         // wipe highlights – cheaper than re‑offsetting
     setAutoFilled(false);
   };
 
@@ -109,200 +100,121 @@ const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => 
   };
 
   /*****************************************************
-   * ----------------- HIGHLIGHT ACTIONS ------------- *
+   * --------------- HIGHLIGHT ACTIONS --------------- *
    *****************************************************/
-  const highlightBlue = () => {
+  const toggleHighlight = () => {
     if (selection.length === 0) return;
-    setBlues(prev => upsertRange(prev, { ...selection }));
-    // remove any overlapping oranges
-    setOranges(prev => prev.filter(o => cursorInRanges([o]) < 0));
-  };
-
-  const highlightOrange = () => {
-    if (selection.length === 0) return;
-    setOranges(prev => upsertRange(prev, { ...selection }));
-    setBlues(prev => prev.filter(b => cursorInRanges([b]) < 0));
-  };
-
-  const removeBlue = () => {
-    if (cursorInBlue < 0) return;
-    setBlues(prev => prev.filter((_, i) => i !== cursorInBlue));
-  };
-  const removeOrange = () => {
-    if (cursorInOrange < 0) return;
-    setOranges(prev => prev.filter((_, i) => i !== cursorInOrange));
+    if (cursorInSegment >= 0) {
+      // remove existing
+      setSegments(prev => prev.filter((_, i) => i !== cursorInSegment));
+    } else {
+      setSegments(prev => upsertRange(prev, { ...selection }));
+    }
+    setAutoFilled(false);
   };
 
   /*****************************************************
-   * -------------------- PARSER --------------------- *
+   * -------------------- AUTOFILL ------------------- *
    *****************************************************/
-  /*  A full, 1‑to‑1 port of your Swift `ItemParser` is >600 LOC and would hide
-      the core idea in noise.  Instead we expose *one* public function —
-      `autoFill()`.  The internal heuristics mirror the Swift approach, but are
-      collapsed for clarity.  Feel free to open a separate file and iterate. */
   const autoFill = useCallback(() => {
     if (autoFilled) {
-      // restore original user highlighting
-      setBlues(prev => prev);
-      setOranges(prev => prev);
+      setSegments([]);        // clear auto‑fill highlights
       setAutoFilled(false);
       return;
     }
 
-    // --- very naive heuristic ---
-    // Split by double‑newline as *item delimiter*.  First non‑empty line =>
-    // title (orange); subsequent lines => body (blue).
-    const nextBlues: Range[] = [];
-    const nextOranges: Range[] = [];
+    const next: Range[] = [];
     let offset = 0;
-    const blocks = plainText.split(/\n{2,}/);
-    blocks.forEach(block => {
+    plainText.split(/\n{2,}/).forEach(block => {
       const trimmed = block.trim();
       if (!trimmed) {
-        offset += block.length + 2; // preserve separator length
+        offset += block.length + 2;
         return;
       }
-      const nl = block.indexOf("\n");
-      if (nl === -1) {
-        // single‑line -> assume title
-        nextOranges.push({ location: offset, length: trimmed.length });
-      } else {
-        // multiline => first line title, rest body
-        nextOranges.push({ location: offset, length: nl });
-        const bodyStart = offset + nl + 1;
-        const bodyLen = trimmed.length - nl - 1;
-        nextBlues.push({ location: bodyStart, length: bodyLen });
-      }
+      next.push({ location: offset + block.indexOf(trimmed), length: trimmed.length });
       offset += block.length + 2;
     });
 
-    setBlues(nextBlues);
-    setOranges(nextOranges);
+    setSegments(next);
     setAutoFilled(true);
   }, [plainText, autoFilled]);
 
   /*****************************************************
-   * -------------- ITEM CONSTRUCTION --------------- *
+   * ---------------- ITEM CONSTRUCTION -------------- *
    *****************************************************/
-  const makeItems = useCallback((): Item[] => {
-    const ordered = [...blues.map(b => ({ r: b, t: "blue" })), ...oranges.map(o => ({ r: o, t: "orange" }))].sort(
-      (a, b) => a.r.location - b.r.location,
-    );
+  const makeItems = (): Item[] => {
+    const ranges = segments.length
+      ? segments
+      : [
+          {
+            location: 0,
+            length: plainText.trim().length,
+          },
+        ];
 
-    const items: Item[] = [];
-    let current: Partial<Item> = {};
-
-    const extract = (range: Range) => plainText.slice(range.location, range.location + range.length);
-
-    ordered.forEach(part => {
-      if (part.t === "orange") {
-        if (current.title) {
-          // commit and start new item
-          items.push(
-            new Item(
-              uuidv4(),
-              list.id,
-              current.title!,
-              current.content ?? "",
-              null,
-              items.length,
-              new Date(),
-              new Date(),
-            ),
-          );
-          current = {};
-        }
-        current.title = extract(part.r);
-      } else {
-        if (current.content) {
-          items.push(
-            new Item(
-              uuidv4(),
-              list.id,
-              current.title ?? null,
-              current.content,
-              null,
-              items.length,
-              new Date(),
-              new Date(),
-            ),
-          );
-          current = {};
-        }
-        current.content = extract(part.r);
-      }
-    });
-    if (current.title || current.content) {
-      items.push(
-        new Item(
+    return ranges
+      .sort((a, b) => a.location - b.location)
+      .map((r, idx) => {
+        const content = plainText.slice(r.location, r.location + r.length).trim();
+        return new Item(
           uuidv4(),
           list.id,
-          current.title ?? null,
-          current.content ?? "",
-          null,
-          items.length,
+          content,
+          null,          // image
+          idx,           // order
           new Date(),
           new Date(),
-        ),
-      );
-    }
-    return items;
-  }, [blues, oranges, plainText, list.id]);
+        );
+      });
+  };
 
   const persist = async () => {
-    const items = makeItems();
-    if (items.length === 0) {
-      onDismiss();
-      return;
-    }
-    await addItems(items);
+    const items = makeItems().filter(i => i.content.length); // ignore blanks
+    if (items.length) await addItems(items);
     onDismiss();
-    // Ensure the list is refreshed after dismissing the modal
   };
 
   /*****************************************************
    * ----------------- HIGHLIGHT VIEW ---------------- *
    *****************************************************/
   const highlightedPreview = useMemo(() => {
-    if (blues.length === 0 && oranges.length === 0) return null;
-    const segments: { text: string; color?: string }[] = [];
-
-    const sorted = [...blues.map(b => ({ r: b, c: "#0a84ff" })), ...oranges.map(o => ({ r: o, c: "#ff9f0a" }))].sort(
-      (a, b) => a.r.location - b.r.location,
-    );
+    if (segments.length === 0) return null;
+    const segs: { text: string; highlight: boolean }[] = [];
     let cursor = 0;
-    sorted.forEach(({ r, c }) => {
-      if (cursor < r.location) segments.push({ text: plainText.slice(cursor, r.location) });
-      segments.push({ text: plainText.slice(r.location, r.location + r.length), color: c });
+    const ordered = [...segments].sort((a, b) => a.location - b.location);
+
+    ordered.forEach(r => {
+      if (cursor < r.location) segs.push({ text: plainText.slice(cursor, r.location), highlight: false });
+      segs.push({ text: plainText.slice(r.location, r.location + r.length), highlight: true });
       cursor = r.location + r.length;
     });
-    if (cursor < plainText.length) segments.push({ text: plainText.slice(cursor) });
+    if (cursor < plainText.length) segs.push({ text: plainText.slice(cursor), highlight: false });
 
     return (
       <Text style={styles.previewText} selectable>
-        {segments.map((s, i) =>
-          s.color ? (
+        {segs.map((s, i) =>
+          s.highlight ? (
             <View
               key={i}
               style={{
-                backgroundColor: s.color,
+                backgroundColor: "#0a84ff",
                 borderRadius: 4,
                 paddingHorizontal: 2,
                 marginRight: 1,
               }}
             >
-              <Text style={{ color: '#fff' }}>{s.text}</Text>
+              <Text style={{ color: "#fff" }}>{s.text}</Text>
             </View>
           ) : (
             <Text key={i}>{s.text}</Text>
-          )
+          ),
         )}
       </Text>
     );
-  }, [plainText, blues, oranges]);
+  }, [plainText, segments]);
 
   /*****************************************************
-   * ------------------   RENDER   ------------------- *
+   * -------------------- RENDER --------------------- *
    *****************************************************/
   return (
     <Modal visible={visible} onRequestClose={onDismiss} animationType="slide">
@@ -310,6 +222,7 @@ const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => 
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.container}
       >
+        {/* HEADER */}
         <View style={styles.header}>
           <Text style={styles.title}>Parser</Text>
           <Pressable onPress={persist}>
@@ -317,6 +230,7 @@ const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => 
           </Pressable>
         </View>
 
+        {/* INPUT + PREVIEW */}
         <ScrollView style={styles.body} keyboardDismissMode="interactive">
           <TextInput
             style={styles.input}
@@ -327,24 +241,18 @@ const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => 
             selection={{ start: selection.location, end: selection.location + selection.length }}
             onSelectionChange={onSelectionChange}
           />
-
-          {/* PREVIEW */}
           {highlightedPreview}
         </ScrollView>
 
         {/* ACTIONS */}
         <View style={styles.actions}>
           <Pressable style={styles.actionBtn} onPress={autoFill}>
-            <Text style={styles.actionTxt}>{autoFilled ? "Remove Auto‑Fill" : "Auto‑Fill"}</Text>
+            <Text style={styles.actionTxt}>{autoFilled ? "Clear Auto‑Fill" : "Auto‑Fill"}</Text>
           </Pressable>
-          <Pressable style={styles.actionBtn} onPress={cursorInBlue >= 0 ? removeBlue : highlightBlue}>
-            <Text style={styles.actionTxt}>{cursorInBlue >= 0 ? "Remove Blue" : "Blue"}</Text>
-          </Pressable>
-          <Pressable
-            style={styles.actionBtn}
-            onPress={cursorInOrange >= 0 ? removeOrange : highlightOrange}
-          >
-            <Text style={styles.actionTxt}>{cursorInOrange >= 0 ? "Remove Orange" : "Orange"}</Text>
+          <Pressable style={styles.actionBtn} onPress={toggleHighlight}>
+            <Text style={styles.actionTxt}>
+              {cursorInSegment >= 0 ? "Remove Highlight" : "Highlight"}
+            </Text>
           </Pressable>
           <Pressable style={styles.closeBtn} onPress={onDismiss}>
             <Text style={styles.actionTxt}>×</Text>

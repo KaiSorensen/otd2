@@ -185,46 +185,52 @@ export async function retrieveList(listId: string): Promise<List | null> {
     return database.get<wList>('lists')
         .query(Q.where('id2', listId))
         .fetch()
-        .then((list) => {
+        .then(async (list) => {
             if (!list || list.length === 0) {
                 return null;
             }
 
             // Get library configuration if it exists
-            return database.get<wLibraryList>('librarylists')
+            let libraryList = await database.get<wLibraryList>('librarylists')
                 .query(
                     Q.where('list_id', listId)
                 )
-                .fetch()
-                .then((libraryList) => {
-                    if (libraryList.length === 0) {
-                        console.error('Library list not found');
-                        return null;
-                    }
+                .fetch();
 
-                    const liblist = new List(
-                        list[0].id2,
-                        list[0].owner_id,
-                        list[0].title,
-                        list[0].description,
-                        list[0].cover_image_url,
-                        list[0].is_public,
-                        libraryList[0].folder_id,
-                        libraryList[0].sort_order,
-                        libraryList[0].today,
-                        libraryList[0].current_item,
-                        libraryList[0].notify_on_new,
-                        libraryList[0].notify_time,
-                        libraryList[0].notify_days,
-                        libraryList[0].order_index
-                    );
+            if (libraryList.length > 1) {
+                console.error(`[retrieveList] Duplicate librarylists found for list: ${listId}. Count: ${libraryList.length}`);
+                console.error(`[retrieveList] Duplicate IDs:`, libraryList.map(l => l.id2));
+                // Delete all but the first one
+                for (let i = 1; i < libraryList.length; i++) {
+                    await libraryList[i].markAsDeleted();
+                }
+                // Refetch after cleanup
+                libraryList = [libraryList[0]];
+            }
 
-                    return liblist;
-                })
-                .catch((error) => {
-                    console.error('Error retrieving list:', error);
-                    return null;
-                });
+            if (libraryList.length === 0) {
+                console.error('Library list not found');
+                return null;
+            }
+
+            const liblist = new List(
+                list[0].id2,
+                list[0].owner_id,
+                list[0].title,
+                list[0].description,
+                list[0].cover_image_url,
+                list[0].is_public,
+                libraryList[0].folder_id,
+                libraryList[0].sort_order,
+                libraryList[0].today,
+                libraryList[0].current_item,
+                libraryList[0].notify_on_new,
+                libraryList[0].notify_time,
+                libraryList[0].notify_days,
+                libraryList[0].order_index
+            );
+
+            return liblist;
         });
 }
 
@@ -310,10 +316,30 @@ export async function populateLibrary(user: User) {
 
 export async function populateUserLists(user: User) {
   try {
-    const libraryLists = await database.get<wLibraryList>('librarylists')
+    let libraryLists = await database.get<wLibraryList>('librarylists')
       .query(Q.where('owner_id', user.id))
       .fetch();
-    // console.log('[populateUserLists] Loaded libraryLists for user', user.id, ':', libraryLists.map(l => ({list_id: l.list_id, folder_id: l.folder_id})));
+    // Duplicate cleanup: group by (owner_id, folder_id, list_id)
+    const seen = new Set();
+    const toDelete: wLibraryList[] = [];
+    const uniqueLibraryLists: wLibraryList[] = [];
+    for (const entry of libraryLists) {
+      const key = `${entry.owner_id}|${entry.folder_id}|${entry.list_id}`;
+      if (seen.has(key)) {
+        toDelete.push(entry);
+      } else {
+        seen.add(key);
+        uniqueLibraryLists.push(entry);
+      }
+    }
+    if (toDelete.length > 0) {
+      console.error(`[populateUserLists] Duplicate librarylists found for user: ${user.id}. Count: ${toDelete.length}`);
+      console.error(`[populateUserLists] Duplicate IDs:`, toDelete.map(l => l.id2));
+      for (const entry of toDelete) {
+        await entry.markAsDeleted();
+      }
+      libraryLists = uniqueLibraryLists;
+    }
 
     const lists: List[] = [];
     for (const libraryEntry of libraryLists) {
@@ -352,9 +378,30 @@ export async function populateUserLists(user: User) {
 }
 
 export async function populateFoldersListIDs(folder: Folder) {
-  const libraryLists = await database.get<wLibraryList>('librarylists')
+  let libraryLists = await database.get<wLibraryList>('librarylists')
     .query(Q.where('folder_id', folder.id))
     .fetch();
+  // Duplicate cleanup: group by (owner_id, folder_id, list_id)
+  const seen = new Set();
+  const toDelete: wLibraryList[] = [];
+  const uniqueLibraryLists: wLibraryList[] = [];
+  for (const entry of libraryLists) {
+    const key = `${entry.owner_id}|${entry.folder_id}|${entry.list_id}`;
+    if (seen.has(key)) {
+      toDelete.push(entry);
+    } else {
+      seen.add(key);
+      uniqueLibraryLists.push(entry);
+    }
+  }
+  if (toDelete.length > 0) {
+    console.error(`[populateFoldersListIDs] Duplicate librarylists found for folder: ${folder.id}. Count: ${toDelete.length}`);
+    console.error(`[populateFoldersListIDs] Duplicate IDs:`, toDelete.map(l => l.id2));
+    for (const entry of toDelete) {
+      await entry.markAsDeleted();
+    }
+    libraryLists = uniqueLibraryLists;
+  }
   folder.listsIDs = libraryLists.map((entry) => entry.list_id);
   // console.log('[populateFoldersListIDs] Folder', folder.id, 'listsIDs:', folder.listsIDs);
 }
