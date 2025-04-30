@@ -573,7 +573,7 @@ export async function initializeTodayItem(list: List) {
     return;
   }
   list.currentItem = items[0].id;
-  await updateList(list.id, { currentItem: list.currentItem });
+  await updateLibraryList(list.ownerID, list.folderID, list.id, { currentItem: list.currentItem });
 }
 
 export async function rotateTodayItemsAllLists(user: User) {
@@ -630,10 +630,6 @@ export async function rotateTodayItemForList(userID: string, list: List, directi
   
   // Sync after updating the list
   scheduleSync();
-}
-
-export async function setTodayItemForList(listId: string, itemId: string) {
-  await updateList(listId, { currentItem: itemId });
 }
 
 // ======= UPDATE FUNCTIONS =======
@@ -721,9 +717,8 @@ export async function updateLibraryList(ownerID: string, folderID: string, listI
   notifyDays?: DayOfWeek | null;
   orderIndex?: number;
 }): Promise<void> {
-  console.log('[updateLibraryList] Updating library list:', listID);
   await database.write(async () => {
-    const libraryList = await database.get<wLibraryList>('librarylists')
+    const libraryLists = await database.get<wLibraryList>('librarylists')
       .query(
         Q.where('owner_id', ownerID),
         Q.where('folder_id', folderID),
@@ -731,17 +726,20 @@ export async function updateLibraryList(ownerID: string, folderID: string, listI
       )
       .fetch();
 
+    if (libraryLists.length > 1) {
+      console.error(`[updateLibraryList] Duplicate librarylists found for owner: ${ownerID}, folder: ${folderID}, list: ${listID}. Count: ${libraryLists.length}`);
+      console.error(`[updateLibraryList] Duplicate IDs:`, libraryLists.map(l => l.id2));
+      // Delete all but the first one
+      for (let i = 1; i < libraryLists.length; i++) {
+        await libraryLists[i].markAsDeleted();
+      }
+    }
 
-
-    if (libraryList.length === 0) {
-      // console.log('FAILED TO FIND LIBRARY LIST:');
-      // console.log('ownerID:', ownerID);
-      // console.log('folderID:', folderID);
-      // console.log('listID:', listID);
+    if (libraryLists.length === 0) {
       throw new Error('LibraryList is not in user library');
     }
 
-    await libraryList[0].update((raw: wLibraryList) => {
+    await libraryLists[0].update((raw: wLibraryList) => {
       if (config.sortOrder) raw.sort_order = config.sortOrder;
       if (config.today !== undefined) raw.today = config.today;
       if (config.currentItem !== undefined) raw.current_item = config.currentItem;
@@ -896,7 +894,7 @@ export async function addItems(items: Item[]) {
 }
 
 export async function getItemsInList(list: List): Promise<Item[]> {
-  console.log('[getItemsInList] Starting to fetch items for list:', list.id);
+  // console.log('[getItemsInList] Starting to fetch items for list:', list.id);
   let itemsData = await database.get<wItem>('items')
     .query(Q.where('list_id', list.id))
     .fetch();
@@ -1041,7 +1039,6 @@ export const queued = {
   initializeTodayItem: queueWrap(initializeTodayItem),
   rotateTodayItemsAllLists: queueWrap(rotateTodayItemsAllLists),
   rotateTodayItemForList: queueWrap(rotateTodayItemForList),
-  setTodayItemForList: queueWrap(setTodayItemForList),
   updateUser: queueWrap(updateUser),
   updateFolder: queueWrap(updateFolder),
   updateList: queueWrap(updateList),
