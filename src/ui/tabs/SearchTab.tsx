@@ -226,17 +226,14 @@ const SearchScreen = () => {
   );
 
   const renderItemResult = (item: Item) => {
-    // // console.log('Rendering item:', item.id, item.title, item.content?.substring(0, 50));
     return (
       <TouchableOpacity
         style={[styles.resultItem, { backgroundColor: colors.card, shadowColor: colors.shadow }]}
         onPress={() => {
-          // // console.log('Item pressed:', item.id);
           setSelectedItem(item);
         }}
       >
         <View style={styles.resultContent}>
-          <Text style={[styles.resultTitle, { color: colors.textPrimary }]}>{item.title || 'Untitled'}</Text>
           <Text style={[styles.resultDescription, { color: colors.textSecondary }]} numberOfLines={2}>
             {stripHtml(item.content || '')}
           </Text>
@@ -247,8 +244,7 @@ const SearchScreen = () => {
         <TouchableOpacity
           style={styles.actionButton}
           onPress={(e) => {
-            e.stopPropagation(); // Prevent triggering the parent onPress
-            // // console.log('Item arrow pressed:', item.id);
+            e.stopPropagation();
             setSelectedItem(item);
           }}
         >

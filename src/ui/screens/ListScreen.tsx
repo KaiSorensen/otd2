@@ -350,7 +350,6 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
             const newItem = new Item(
               uuidv4(),
               list.id,
-              'New Item',
               '',
               [],
               0,
@@ -493,9 +492,6 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       onPress={() => !isEditMode && setSelectedItem(item)}
     >
       <View style={styles.resultContent}>
-        <Text style={[styles.resultTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-          {item.title || 'Untitled'}
-        </Text>
         <Text style={[styles.resultDescription, { color: colors.textSecondary }]} numberOfLines={2}>
           {stripHtml(item.content)}
         </Text>
@@ -847,11 +843,6 @@ const styles = StyleSheet.create({
   resultContent: {
     flex: 1,
     marginRight: 12,
-  },
-  resultTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
   },
   resultDescription: {
     fontSize: 14,

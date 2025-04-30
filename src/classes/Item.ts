@@ -3,8 +3,7 @@ import { retrieveItem, updateItem } from '../wdb/wdbService';
 export class Item {
     private _id: string;
     private _listID: string;
-    private _title: string | null;
-    private _content: string; // This will store HTML content for rich text
+    private _content: string;
     private _imageURLs: string[] | null;
     private _orderIndex: number;
 
@@ -16,7 +15,6 @@ export class Item {
     constructor(
         id: string,
         listID: string,
-        title: string | null,
         content: string,
         imageURLs: string[] | null,
         orderIndex: number,
@@ -25,7 +23,6 @@ export class Item {
     ) {
         this._id = id;
         this._listID = listID;
-        this._title = title;
         this._content = content || ''; // Ensure content is never null
         this._imageURLs = imageURLs;
         this._orderIndex = orderIndex;
@@ -45,8 +42,7 @@ export class Item {
         return new Item(
             data.id,
             data.listID,
-            data.title,
-            data.content || '', // Ensure content is never null
+            data.content,
             data.imageURLs,
             data.orderIndex,
             data.createdAt,
@@ -58,12 +54,7 @@ export class Item {
     get id(): string { return this._id; }
     get listID(): string { return this._listID; }
 
-    // Getters and setters for mutable properties
-    get title(): string | null { return this._title; }
-    set title(value: string | null) { this._title = value; }
-
-    // Content can now be HTML for rich text
-    get content(): string { return this._content || ''; } // Ensure content is never null
+    get content(): string { return this._content; } // Ensure content is never null
     set content(value: string) { this._content = value || ''; } // Ensure content is never null
 
     get imageURLs(): string[] | null { return this._imageURLs; }
@@ -83,7 +74,6 @@ export class Item {
         // // console.log('Content preview:', this._content?.substring(0, 100));
         
         await updateItem(this._id, {
-            title: this._title,
             content: this._content || '', // Ensure content is never null
             imageURLs: this._imageURLs,
             orderIndex: this._orderIndex,
@@ -94,7 +84,6 @@ export class Item {
     async refresh(): Promise<void> {
         const data = await retrieveItem(this._id);
         if (data) {
-            this._title = data.title;
             this._content = data.content || ''; // Ensure content is never null
             this._imageURLs = data.imageURLs;
             this._orderIndex = data.orderIndex;

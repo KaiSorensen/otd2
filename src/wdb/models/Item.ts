@@ -10,8 +10,7 @@ export default class Item extends Model {
 
   @field('id2') id2!: string // id2 is the id from the supabase database
   @field('list_id') list_id!: string
-  @field('title') title!: string
-  @field('content') content!: string
+  @field('content') content!: string 
   @field('image_urls') image_urls!: string[]
   @field('order_index') order_index!: number
   @date('created_at') created_at!: Date

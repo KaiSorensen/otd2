@@ -46,12 +46,6 @@ const PreviewItem: React.FC<PreviewItemProps> = ({ item, onSwipeLeft, onSwipeRig
       {item ? (
         <>
           <Text style={[
-            styles.title,
-            { color: colors.textPrimary }
-          ]}>
-            {item.title || 'Untitled'}
-          </Text>
-          <Text style={[
             styles.content,
             { color: colors.textSecondary }
           ]}>

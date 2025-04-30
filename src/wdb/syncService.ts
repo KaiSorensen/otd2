@@ -67,7 +67,6 @@ const fieldNameMap: { [key: string]: { [key: string]: string } } = {
   items: {
     id2: 'id',
     list_id: 'listid',
-    title: 'title',
     content: 'content',
     image_urls: 'imageurls',
     order_index: 'orderindex',

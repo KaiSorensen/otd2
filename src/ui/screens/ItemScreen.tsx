@@ -29,21 +29,18 @@ const stripHtml = (html: string): string => {
 
 const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false }) => {
   const { colors, isDarkMode } = useColors();
-  const [title, setTitle] = useState<string>(item.title || '');
   const [content, setContent] = useState<string>(stripHtml(item.content || ''));
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
 
   // Log item content for debugging
   useEffect(() => {
-    // // console.log('Item content:', item.id, item.title);
     // // console.log('Content length:', item.content?.length || 0);
     // // console.log('Content preview:', item.content?.substring(0, 100));
   }, []);
 
   // Update state when item prop changes
   useEffect(() => {
-    setTitle(item.title || '');
     setContent(stripHtml(item.content || ''));
     setHasChanges(false);
   }, [item]);
@@ -69,13 +66,9 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false }
     
     setIsSaving(true);
     try {
-      // Update item properties using proper setters
-      item.title = title;
-      
       // Format content as simple HTML
       const htmlContent = `<p>${content.replace(/\n/g, '</p><p>')}</p>`;
       item.content = htmlContent;
-      
       // Save to database
       await item.save();
       setHasChanges(false);
@@ -102,14 +95,6 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false }
   // Handle content change
   const handleContentChange = (text: string) => {
     setContent(text);
-    setHasChanges(true);
-  };
-
-  // Handle title change
-  const handleTitleChange = (text: string) => {
-    // Remove newlines from title
-    const cleanText = text.replace(/\n/g, '');
-    setTitle(cleanText);
     setHasChanges(true);
   };
 
@@ -140,28 +125,6 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false }
       </View>
       
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
-        {/* Title Input */}
-        <TextInput
-          style={[
-            styles.titleInput, 
-            { 
-              color: colors.textPrimary,
-              opacity: canEdit ? 1 : 0.7
-            }
-          ]}
-          value={title}
-          onChangeText={handleTitleChange}
-          placeholder="Title"
-          placeholderTextColor={colors.inputPlaceholder}
-          multiline={false}
-          maxLength={100}
-          returnKeyType="next"
-          editable={canEdit}
-        />
-        
-        {/* Separator Line */}
-        <View style={[styles.separator, { backgroundColor: colors.divider }]} />
-        
         {/* Content Input */}
         <TextInput
           style={[
@@ -219,17 +182,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     color: '#fff',
     fontWeight: '500',
-  },
-  titleInput: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  separator: {
-    height: 1,
-    marginHorizontal: 16,
-    marginBottom: 8,
   },
   contentInput: {
     flex: 1,

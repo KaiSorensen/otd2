@@ -155,7 +155,6 @@ export async function getItemsInList(listID: string): Promise<Item[]> {
   return data.map((item) => new Item(
     item.id,
     item.listid,
-    item.title || '',
     item.content || '',
     item.imageurls || [],
     item.orderindex || 0,

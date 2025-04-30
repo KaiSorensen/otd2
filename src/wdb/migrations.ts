@@ -64,7 +64,6 @@ export default schemaMigrations({
           columns: [
             { name: 'id2', type: 'string' },
             { name: 'list_id', type: 'string', isIndexed: true },
-            { name: 'title', type: 'string', isOptional: true },
             { name: 'content', type: 'string' },
             { name: 'image_urls', type: 'string' },
             { name: 'order_index', type: 'number', isOptional: true },

@@ -141,7 +141,6 @@ export async function storeNewItem(item: Item) {
     await database.get<wItem>('items').create(raw => {
       raw.id2 = item.id || safeUUID();
       raw.list_id = item.listID;
-      raw.title = item.title ?? '';
       raw.content = item.content;
       raw.image_urls = item.imageURLs ?? [];
       raw.order_index = item.orderIndex ?? 0;
@@ -241,7 +240,6 @@ export async function retrieveItem(itemId: string): Promise<Item | null> {
             const item = new Item(
                 data[0].id2,
                 data[0].list_id,
-                data[0].title,
                 data[0].content,
                 data[0].image_urls,
                 data[0].order_index,
@@ -466,7 +464,6 @@ export async function getLibraryItemsBySubstring(user: User, substring: string):
         Q.and(
           Q.where('list_id', listID),
           Q.or(
-            Q.where('title', Q.like(`%${substring}%`)),
             Q.where('content', Q.like(`%${substring}%`))
           )
         )
@@ -480,7 +477,6 @@ export async function getLibraryItemsBySubstring(user: User, substring: string):
       return new Item(
         item.id2,
         item.list_id,
-        item.title,
         item.content,
         item.image_urls,
         item.order_index,
@@ -694,7 +690,6 @@ export async function updateItem(itemId: string, updates: Partial<Item>): Promis
       throw new Error('Item not found');
     }
     await item[0].update((raw: wItem) => {
-      if (updates.title) raw.title = updates.title;
       if (updates.content) raw.content = updates.content;
       if (updates.imageURLs) raw.image_urls = updates.imageURLs;
       if (updates.orderIndex) raw.order_index = updates.orderIndex;
@@ -880,8 +875,7 @@ export async function addItems(items: Item[]) {
       await database.get<wItem>('items').create(raw => {
         raw.id2 = item.id;
         raw.list_id = item.listID;
-        raw.title = item.title ?? '';
-        raw.content = item.content ?? '';
+        raw.content = item.content;
         raw.image_urls = item.imageURLs ?? [];
         raw.order_index = item.orderIndex;
         raw.created_at = item.createdAt;
@@ -900,10 +894,10 @@ export async function getItemsInList(list: List): Promise<Item[]> {
     .fetch();
 
   let itemsObjects = itemsData.map((item) => {
+    // console.log('item:', item.id2, "content:", item.content);
     return new Item(
       item.id2,
       item.list_id,
-      item.title,
       item.content,
       item.image_urls,
       item.order_index,
