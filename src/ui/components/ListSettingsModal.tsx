@@ -11,11 +11,12 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { List } from '../../classes/List';
+import { List, DayOfWeek } from '../../classes/List';
 import { useColors } from '../../contexts/ColorContext';
 import { useAuth } from '../../contexts/UserContext';
 import { deleteList } from '../../wdb/wdbService';
 import { Folder } from '../../classes/Folder';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 // Define type for sort order
 type SortOrderType = "date-first" | "date-last" | "alphabetical" | "manual";
@@ -177,7 +178,10 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
     today: list.today,
     notifyOnNew: list.notifyOnNew,
     sortOrder: list.sortOrder as SortOrderType,
+    notifyTime: list.notifyTime,
+    notifyDays: list.notifyDays,
   });
+  const [editingNotification, setEditingNotification] = useState(false);
 
   // Update local state when modal opens or list changes
   useEffect(() => {
@@ -186,7 +190,10 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
       today: list.today,
       notifyOnNew: list.notifyOnNew,
       sortOrder: list.sortOrder as SortOrderType,
+      notifyTime: list.notifyTime,
+      notifyDays: list.notifyDays,
     });
+    setEditingNotification(false);
   }, [visible, list]);
 
   // Batch settings changes
@@ -239,6 +246,63 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
       Alert.alert('Error', 'Failed to delete list. Please try again.');
     }
   };
+
+  const handleNotificationButtonPress = () => {
+    if (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0) {
+      setLocalSettings(prev => ({ ...prev, notifyTime: null, notifyDays: null }));
+      setEditingNotification(false);
+    } else {
+      setEditingNotification(true);
+    }
+  };
+
+  const handleConfirmNotification = () => {
+    setEditingNotification(false);
+  };
+
+  const handleCancelNotificationEdit = () => {
+    setLocalSettings(prev => ({
+      ...prev,
+      notifyTime: list.notifyTime,
+      notifyDays: list.notifyDays,
+    }));
+    setEditingNotification(false);
+  };
+
+  const handleDayToggle = (day: DayOfWeek) => {
+    setLocalSettings(prev => {
+      const days = prev.notifyDays || [];
+      return {
+        ...prev,
+        notifyDays: days.includes(day)
+          ? days.filter(d => d !== day)
+          : [...days, day],
+      };
+    });
+  };
+
+  const handleTimeChange = (event: any, date?: Date) => {
+    if (date) {
+      setLocalSettings(prev => ({ ...prev, notifyTime: date }));
+    }
+  };
+
+  const getNotificationSummary = () => {
+    if (!localSettings.notifyTime || !localSettings.notifyDays || localSettings.notifyDays.length === 0) return 'Disabled';
+    const days = localSettings.notifyDays.map(d => daysOfWeek.find(day => day.key === d)?.label).join(', ');
+    const time = localSettings.notifyTime ? localSettings.notifyTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    return `${days}${time ? ' at ' + time : ''}`;
+  };
+
+  const daysOfWeek: { key: DayOfWeek; label: string }[] = [
+    { key: 'mon', label: 'Mon' },
+    { key: 'tue', label: 'Tue' },
+    { key: 'wed', label: 'Wed' },
+    { key: 'thu', label: 'Thu' },
+    { key: 'fri', label: 'Fri' },
+    { key: 'sat', label: 'Sat' },
+    { key: 'sun', label: 'Sun' },
+  ];
 
   return (
     <Modal
@@ -344,6 +408,115 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
                     </Text>
                   </View>
                 </>
+              )}
+            </View>
+            
+            {/* Notifications */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notifications</Text>
+              <TouchableOpacity
+                style={[
+                  styles.settingRow,
+                  { borderBottomColor: colors.divider, justifyContent: 'space-between' },
+                ]}
+                onPress={handleNotificationButtonPress}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notifications</Text>
+                <View style={{
+                  backgroundColor: (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0) ? colors.primary : colors.backgroundSecondary,
+                  borderRadius: 16,
+                  paddingHorizontal: 16,
+                  paddingVertical: 6,
+                }}>
+                  <Text style={{ color: (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0) ? 'white' : colors.textSecondary }}>
+                    {getNotificationSummary()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              {editingNotification && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary, marginBottom: 8 }]}>Days</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+                    {daysOfWeek.map(day => (
+                      <TouchableOpacity
+                        key={day.key}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          marginRight: 16,
+                          marginBottom: 8,
+                        }}
+                        onPress={() => handleDayToggle(day.key)}
+                      >
+                        <View style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: colors.primary,
+                          backgroundColor: localSettings.notifyDays && localSettings.notifyDays.includes(day.key) ? colors.primary : 'transparent',
+                          marginRight: 6,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}>
+                          {localSettings.notifyDays && localSettings.notifyDays.includes(day.key) && (
+                            <Icon name="checkmark" size={16} color="white" />
+                          )}
+                        </View>
+                        <Text style={{ color: colors.textPrimary }}>{day.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+                    <Icon name="time-outline" size={20} color={colors.iconSecondary} style={{ marginRight: 8 }} />
+                    <DateTimePicker
+                      value={localSettings.notifyTime || new Date()}
+                      mode="time"
+                      is24Hour={true}
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={handleTimeChange}
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', marginTop: 16 }}>
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        backgroundColor: colors.primary,
+                        borderRadius: 8,
+                        paddingVertical: 10,
+                        alignItems: 'center',
+                        marginRight: 8,
+                      }}
+                      onPress={handleConfirmNotification}
+                      disabled={!(localSettings.notifyDays && localSettings.notifyDays.length > 0)}
+                    >
+                      <Text style={{ color: 'white', fontWeight: '600', fontSize: 16 }}>
+                        Confirm
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        backgroundColor: colors.backgroundSecondary,
+                        borderRadius: 8,
+                        paddingVertical: 10,
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: colors.divider,
+                      }}
+                      onPress={handleCancelNotificationEdit}
+                    >
+                      <Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 16 }}>
+                        Cancel
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              {(localSettings.notifyTime === null || localSettings.notifyDays === null || localSettings.notifyDays.length === 0) && (
+                <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Notifications are disabled.</Text>
               )}
             </View>
             
