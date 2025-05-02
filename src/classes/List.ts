@@ -1,8 +1,8 @@
 import { retrieveList, updateList, retrieveItem, updateLibraryList, rotateTodayItemForList, initializeTodayItem } from '../wdb/wdbService';
 import { Item } from './Item';
 
-type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
-type NotifyDay = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+export type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
+export type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
 export class List {
     private _id: string;
@@ -19,7 +19,7 @@ export class List {
     private _currentItem: string | null;
     private _notifyOnNew: boolean;
     private _notifyTime: Date | null;
-    private _notifyDays: NotifyDay | null;
+    private _notifyDays: DayOfWeek[] | null;
     private _orderIndex: number;
 
 
@@ -37,7 +37,7 @@ export class List {
         currentItem: string | null = null,
         notifyOnNew: boolean = false,
         notifyTime: Date | null = null,
-        notifyDays: NotifyDay | null = null,
+        notifyDays: DayOfWeek[] | null = null,
         orderIndex: number = 0
     ) {
         this._id = id;
@@ -96,8 +96,8 @@ export class List {
     get notifyTime(): Date | null { return this._notifyTime; }
     set notifyTime(value: Date | null) { this._notifyTime = value; }
 
-    get notifyDays(): NotifyDay | null { return this._notifyDays; }
-    set notifyDays(value: NotifyDay | null) { this._notifyDays = value; }
+    get notifyDays(): DayOfWeek[] | null { return this._notifyDays; }
+    set notifyDays(value: DayOfWeek[] | null) { this._notifyDays = value; }
 
     async ensureCurrentItem(): Promise<void> {
         if (!this._currentItem) {

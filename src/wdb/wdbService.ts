@@ -4,6 +4,7 @@ import { User as wUser, Folder as wFolder, List as wList, Item as wItem, Library
 import { QueueService } from './queueService';
 
 import { User, Folder, List, Item } from '../classes';
+import { DayOfWeek, SortOrder } from '../classes/List';
 
 import { v4 as uuidv4 } from 'uuid';
 import { iWantToSync } from './pendingSyncService';
@@ -121,7 +122,7 @@ export async function storeNewList(list: List, adderID: string, folderID: string
       raw.current_item = list.currentItem;
       raw.notify_on_new = list.notifyOnNew;
       raw.notify_time = list.notifyTime;
-      raw.notify_days = list.notifyDays;
+      raw.notify_days = Array.isArray(list.notifyDays) ? (list.notifyDays.join(',') as any) : (list.notifyDays ?? null as any);
       raw.created_at = new Date();
       raw.updated_at = new Date();
 
@@ -226,7 +227,9 @@ export async function retrieveList(listId: string): Promise<List | null> {
                 libraryList[0].current_item,
                 libraryList[0].notify_on_new,
                 libraryList[0].notify_time,
-                libraryList[0].notify_days,
+                libraryList[0].notify_days && libraryList[0].notify_days.length > 0
+                  ? (libraryList[0].notify_days.split(',').filter(Boolean) as DayOfWeek[])
+                  : null,
                 libraryList[0].order_index
             );
 
@@ -365,7 +368,9 @@ export async function populateUserLists(user: User) {
         libraryEntry.current_item,
         libraryEntry.notify_on_new,
         libraryEntry.notify_time,
-        libraryEntry.notify_days,
+        libraryEntry.notify_days && libraryEntry.notify_days.length > 0
+          ? (libraryEntry.notify_days.split(',').filter(Boolean) as DayOfWeek[])
+          : null,
         libraryEntry.order_index
       ));
     }
@@ -747,16 +752,13 @@ export async function updateItem(itemId: string, updates: Partial<Item>): Promis
   scheduleSync();
 }
 
-type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
-type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
-
 export async function updateLibraryList(ownerID: string, folderID: string, listID: string, config: {
   sortOrder?: SortOrder;
   today?: boolean;
   currentItem?: string | null;
   notifyOnNew?: boolean;
   notifyTime?: Date | null;
-  notifyDays?: DayOfWeek | null;
+  notifyDays?: DayOfWeek[] | null;
   orderIndex?: number;
 }): Promise<void> {
   await database.write(async () => {
@@ -787,7 +789,7 @@ export async function updateLibraryList(ownerID: string, folderID: string, listI
       if (config.currentItem !== undefined) raw.current_item = config.currentItem;
       if (config.notifyOnNew !== undefined) raw.notify_on_new = config.notifyOnNew;
       if (config.notifyTime) raw.notify_time = config.notifyTime;
-      if (config.notifyDays) raw.notify_days = config.notifyDays;
+      if (config.notifyDays) raw.notify_days = Array.isArray(config.notifyDays) ? (config.notifyDays.join(',') as any) : (config.notifyDays ?? null as any);
       if (config.orderIndex !== undefined) raw.order_index = config.orderIndex;
       raw.updated_at = new Date();
     });

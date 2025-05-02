@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@notifee/react-native": "^9.1.8",
     "@nozbe/simdjson": "3.9.4",
     "@nozbe/watermelondb": "0.28.0",
     "@react-native-async-storage/async-storage": "1.24.0",
@@ -40,6 +41,7 @@
     "querystring-es3": "0.2.1",
     "react": "19.0.0",
     "react-native": "0.79.1",
+    "react-native-background-fetch": "^4.2.7",
     "react-native-config": "1.5.5",
     "react-native-crypto": "2.2.0",
     "react-native-crypto-js": "1.0.0",
