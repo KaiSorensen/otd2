@@ -17,7 +17,7 @@ import { useAuth } from '../../contexts/UserContext';
 import { deleteList } from '../../wdb/wdbService';
 import { Folder } from '../../classes/Folder';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { scheduleBatchNotificationsForList } from '../../notifications/notifService';
+import { scheduleBatchNotificationsForList, cancelNotificationsForList } from '../../notifications/notifService';
 
 // Define type for sort order
 type SortOrderType = "date-first" | "date-last" | "alphabetical" | "manual";
@@ -205,7 +205,7 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
   // Save all changes when modal is closed
   const handleClose = async () => {
     onSave(localSettings);
-    // Schedule notifications if notifyTime and notifyDays are set
+    // Schedule or cancel notifications based on settings
     if (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0) {
       try {
         const batchCount = Math.min(Math.floor(64 / (currentUser?.getNotificationLists().length || 1)), 32);
@@ -214,6 +214,12 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
           list,
           batchCount
         );
+      } catch (e) {
+        // Optionally log error
+      }
+    } else {
+      try {
+        await cancelNotificationsForList(list);
       } catch (e) {
         // Optionally log error
       }
