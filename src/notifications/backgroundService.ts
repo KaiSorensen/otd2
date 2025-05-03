@@ -10,8 +10,9 @@ import { User } from '../classes/User';
 export async function initBackgroundService(user: User) {
     await initNotifications();
 
-    const todayLists = user.getTodayLists();
-    const notifsPerList = 64 / todayLists.length; // which means we'll have notifications ready for this many days
+    const notificationLists = user.getNotificationLists();
+
+    const notifsPerList = Math.min(64 / notificationLists.length, 32); // which means we'll have notifications ready for this many days
     const batchCount = Math.floor(notifsPerList);
 
     BackgroundFetch.configure(
@@ -23,10 +24,10 @@ export async function initBackgroundService(user: User) {
         },
         async (taskId) => {
             try {
-                for (const list of todayLists) {
+                for (const list of notificationLists) {
                     if (list.notifyTime) {
                         await cancelNotificationsForList(list);
-                        await scheduleBatchNotificationsForList(list, list.notifyTime.getHours(), list.notifyTime.getMinutes(), batchCount, 1);
+                        await scheduleBatchNotificationsForList(list, batchCount);
                     }
                 }
             } catch (e) {

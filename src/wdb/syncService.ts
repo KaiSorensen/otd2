@@ -43,6 +43,8 @@ const fieldNameMap: { [key: string]: { [key: string]: string } } = {
     email: 'email',
     avatar_url: 'avatarurl',
     notifs_enabled: 'notifsenabled',
+    selected_today_list_index: 'selectedtodaylistindex',
+    date_last_rotated_today_lists: 'datelastrotatedtodaylists',
     created_at: 'createdat',
     updated_at: 'updatedat'
   },

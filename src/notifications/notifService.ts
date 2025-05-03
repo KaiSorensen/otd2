@@ -1,6 +1,6 @@
 // notificationManager.ts
 import notifee, { AndroidImportance, TriggerType, TimestampTrigger } from '@notifee/react-native';
-import { List } from '../classes/List';
+import { List, DayOfWeek } from '../classes/List';
 
 export async function initNotifications() {
   await notifee.requestPermission();
@@ -12,32 +12,6 @@ export async function initNotifications() {
   });
 }
 
-// export async function scheduleTodayNotification(list: List, hour = 8, minute = 0) {
-//   // Use the List class's getTodayItem method to get the current item
-//   const item = await list.getTodayItem();
-//   if (!item) return;
-//   const content = item.content;
-
-//   const fireDate = new Date();
-//   fireDate.setHours(hour, minute, 0, 0);
-
-//   if (Date.now() > fireDate.getTime()) return; // Don't schedule if it's already past
-
-//   const trigger: TimestampTrigger = {
-//     type: TriggerType.TIMESTAMP,
-//     timestamp: fireDate.getTime(),
-//   };
-
-//   await notifee.createTriggerNotification(
-//     {
-//       title: 'Your Daily Insight',
-//       body: content.slice(0, 200) + (content.length > 200 ? '…' : ''),
-//       android: { channelId: 'default' },
-//     },
-//     trigger
-//   );
-// }
-
 /**
  * Schedule notifications for the next N items in a list, starting at a given time.
  * @param list List instance
@@ -46,7 +20,8 @@ export async function initNotifications() {
  * @param count Number of items to schedule
  * @param intervalDays Days between notifications (default 1)
  */
-export async function scheduleBatchNotificationsForList(list: List, startHour: number, startMinute: number, count: number, intervalDays: number = 1) {
+export async function scheduleBatchNotificationsForList(list: List, count: number) {
+  console.log('Scheduling batch notifications for list', list.title, count);
   const items = await (await import('../wdb/wdbService')).getItemsInList(list);
   if (!items.length) return;
 
@@ -58,18 +33,39 @@ export async function scheduleBatchNotificationsForList(list: List, startHour: n
     if (startIdx === -1) startIdx = 0;
   }
 
-  // Schedule up to N notifications, wrapping if needed
-  const now = new Date();
-  let fireDate = new Date(now);
-  fireDate.setHours(startHour, startMinute, 0, 0);
-  if (fireDate < now) fireDate.setDate(fireDate.getDate() + 1);
+  // Use list.notifyDays and list.notifyTime
+  const notifyDays = list.notifyDays || ['mon','tue','wed','thu','fri','sat','sun'];
+  const notifyTime = list.notifyTime || new Date();
+  const dayOrder = ['sun','mon','tue','wed','thu','fri','sat'];
 
-  for (let i = 0; i < count; i++) {
-    const item = items[(startIdx + i) % items.length];
+  // Find the next valid notification date
+  function getNextNotificationDate(from: Date, allowedDays: string[], hour: number, minute: number) {
+    let date = new Date(from);
+    for (let i = 0; i < 7; i++) {
+      date.setDate(from.getDate() + i);
+      if (allowedDays.includes(dayOrder[date.getDay()])) {
+        date.setHours(hour, minute, 0, 0);
+        if (date > from) return new Date(date);
+      }
+    }
+    // fallback: next week
+    date.setDate(from.getDate() + 7);
+    date.setHours(hour, minute, 0, 0);
+    return date;
+  }
+
+  let scheduled = 0;
+  let idx = startIdx;
+  let now = new Date();
+  let fireDate = getNextNotificationDate(now, notifyDays, notifyTime.getHours(), notifyTime.getMinutes());
+
+  while (scheduled < count && idx < items.length) {
+    const item = items[idx];
     const trigger: TimestampTrigger = {
       type: TriggerType.TIMESTAMP,
       timestamp: fireDate.getTime(),
     };
+    console.log('Scheduling notification for', item.content, fireDate);
     await notifee.createTriggerNotification(
       {
         title: list.title || 'Of The Day',
@@ -78,7 +74,10 @@ export async function scheduleBatchNotificationsForList(list: List, startHour: n
       },
       trigger
     );
-    fireDate = new Date(fireDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+    // Find the next valid notification date
+    fireDate = getNextNotificationDate(fireDate, notifyDays, notifyTime.getHours(), notifyTime.getMinutes());
+    idx++;
+    scheduled++;
   }
 }
 

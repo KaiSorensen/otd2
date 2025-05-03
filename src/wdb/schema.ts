@@ -11,6 +11,8 @@ const mySchema = appSchema({
         { name: 'email', type: 'string' },
         { name: 'avatar_url', type: 'string', isOptional: true },
         { name: 'notifs_enabled', type: 'boolean' },
+        { name: 'selected_today_list_index', type: 'number', isOptional: true },
+        { name: 'date_last_rotated_today_lists', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

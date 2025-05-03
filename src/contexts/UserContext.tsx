@@ -2,6 +2,8 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { User } from '../classes/User';
 import { subscribeToAuthChanges } from '../supabase/authService';
 import { retrievePopulatedUser } from '../wdb/wdbService';
+import { initBackgroundService } from '../notifications/backgroundService';
+import { scheduleBatchNotificationsForList } from '../notifications/notifService';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -26,6 +28,8 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+
 
   // Function to refresh user data that can be called from components
   // Use case: to refresh the whole UI from top-down
@@ -57,7 +61,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       currentUser.username,
       currentUser.email,
       currentUser.avatarURL,
-      currentUser.notifsEnabled
+      currentUser.notifsEnabled,
+      currentUser.selectedTodayListIndex,
+      currentUser.dateLastRotatedTodayLists
     );
     
     // Copy all properties from the refreshed current user to the new user
@@ -69,11 +75,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    let initialized = false;
     // // console.log('Setting up auth subscription');
-    const subscription = subscribeToAuthChanges((user) => {
-      // // console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+    const subscription = subscribeToAuthChanges(async (user) => {
       setCurrentUser(user);
       setLoading(false);
+      if (user && !initialized) {
+        initialized = true;
+        try {
+          await initBackgroundService(user);
+          // Queue the next batch of notifications for all today lists
+          const notificationLists = user.getNotificationLists();
+          const notifsPerList = Math.min(64 / notificationLists.length, 32);
+          const batchCount = Math.floor(notifsPerList);
+          for (const list of notificationLists) {
+            if (list.notifyTime) {
+              scheduleBatchNotificationsForList(
+                list,
+                batchCount
+              );
+            }
+          }
+        } catch (e) {
+          // Optionally log error
+        }
+      }
     });
 
     // Fix the unsubscribe call

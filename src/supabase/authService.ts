@@ -268,7 +268,9 @@ export const getUserData = async (userId: string): Promise<User | null> => {
         data.username,
         data.email,
         data.avatarURL,
-        data.notifsEnabled
+        data.notifsEnabled,
+        data.selectedTodayListIndex,
+        data.dateLastRotatedTodayLists
       );
     }
     return null;
@@ -286,7 +288,9 @@ export const createUserFromSupabaseUser = (supabaseUser: any): User => {
     supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User',
     supabaseUser.email || 'unknown@example.com',
     supabaseUser.user_metadata?.avatar_url || null,
-    true
+    true,
+    0,
+    null
   );
 };
 

@@ -29,7 +29,9 @@ export async function retrieveUser(userId: string): Promise<User | null> {
       data.username, 
       data.email, 
       data.avatarurl, 
-      data.notifsenabled
+      data.notifsenabled,
+      data.selectedTodayListIndex,
+      data.dateLastRotatedTodayLists
     );
     
     return user;
@@ -64,7 +66,9 @@ export async function getUsersBySubstring(substring: string, isInternetReachable
     user.username, 
     user.email, 
     user.avatarurl, 
-    user.notifsenabled
+    user.notifsenabled,
+    user.selectedTodayListIndex,
+    user.dateLastRotatedTodayLists
   ));
 }
 

@@ -17,6 +17,7 @@ import { useAuth } from '../../contexts/UserContext';
 import { deleteList } from '../../wdb/wdbService';
 import { Folder } from '../../classes/Folder';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { scheduleBatchNotificationsForList } from '../../notifications/notifService';
 
 // Define type for sort order
 type SortOrderType = "date-first" | "date-last" | "alphabetical" | "manual";
@@ -202,8 +203,21 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
   };
 
   // Save all changes when modal is closed
-  const handleClose = () => {
+  const handleClose = async () => {
     onSave(localSettings);
+    // Schedule notifications if notifyTime and notifyDays are set
+    if (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0) {
+      try {
+        const batchCount = Math.min(Math.floor(64 / (currentUser?.getNotificationLists().length || 1)), 32);
+        // Default batchCount to 7, intervalDays to 1
+        scheduleBatchNotificationsForList(
+          list,
+          batchCount
+        );
+      } catch (e) {
+        // Optionally log error
+      }
+    }
     onClose();
   };
 
@@ -252,6 +266,13 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
       setLocalSettings(prev => ({ ...prev, notifyTime: null, notifyDays: null }));
       setEditingNotification(false);
     } else {
+      // If no days are selected, default to all days checked
+      // If no time is set, default to now
+      setLocalSettings(prev => ({
+        ...prev,
+        notifyDays: prev.notifyDays && prev.notifyDays.length > 0 ? prev.notifyDays : ['mon','tue','wed','thu','fri','sat','sun'],
+        notifyTime: prev.notifyTime || new Date(),
+      }));
       setEditingNotification(true);
     }
   };
@@ -289,9 +310,20 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
 
   const getNotificationSummary = () => {
     if (!localSettings.notifyTime || !localSettings.notifyDays || localSettings.notifyDays.length === 0) return 'Disabled';
-    const days = localSettings.notifyDays.map(d => daysOfWeek.find(day => day.key === d)?.label).join(', ');
+    const daysArr = localSettings.notifyDays;
+    const allDays: DayOfWeek[] = ['mon','tue','wed','thu','fri','sat','sun'];
+    const weekdays: DayOfWeek[] = ['mon','tue','wed','thu','fri'];
+    const weekends: DayOfWeek[] = ['sat','sun'];
+    let daysLabel = daysArr.map(d => daysOfWeek.find(day => day.key === d)?.label).join(', ');
+    if (daysArr.length === 7 && allDays.every(d => daysArr.includes(d))) {
+      daysLabel = 'Daily';
+    } else if (daysArr.length === 5 && weekdays.every(d => daysArr.includes(d))) {
+      daysLabel = 'Weekdays';
+    } else if (daysArr.length === 2 && weekends.every(d => daysArr.includes(d))) {
+      daysLabel = 'Weekends';
+    }
     const time = localSettings.notifyTime ? localSettings.notifyTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-    return `${days}${time ? ' at ' + time : ''}`;
+    return `${daysLabel}${time ? ' at ' + time : ''}`;
   };
 
   const daysOfWeek: { key: DayOfWeek; label: string }[] = [
@@ -424,12 +456,16 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
               >
                 <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Notifications</Text>
                 <View style={{
-                  backgroundColor: (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0) ? colors.primary : colors.backgroundSecondary,
+                  backgroundColor: (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0 && !editingNotification) ? colors.primary : colors.backgroundSecondary,
                   borderRadius: 16,
                   paddingHorizontal: 16,
                   paddingVertical: 6,
                 }}>
-                  <Text style={{ color: (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0) ? 'white' : colors.textSecondary }}>
+                  <Text style={{
+                    color: editingNotification
+                      ? colors.textSecondary
+                      : (localSettings.notifyTime && localSettings.notifyDays && localSettings.notifyDays.length > 0 ? 'white' : colors.textSecondary),
+                  }}>
                     {getNotificationSummary()}
                   </Text>
                 </View>

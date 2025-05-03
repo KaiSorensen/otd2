@@ -13,6 +13,7 @@ export class User {
     private _avatarURL: string | null;
     private _notifsEnabled: boolean;
     private _selectedTodayListIndex: number;
+    private _dateLastRotatedTodayLists: Date | null;
 
     // these are not in User table of the database, but they get populated when logged in
     private _rootFolders: Folder[];
@@ -24,7 +25,9 @@ export class User {
         username: string,
         email: string,
         avatarURL: string | null,
-        notifsEnabled: boolean
+        notifsEnabled: boolean,
+        selectedTodayListIndex: number | 0,
+        dateLastRotatedTodayLists: Date | null
     ) {
 
         this._id = id;
@@ -32,10 +35,12 @@ export class User {
         this._email = email;
         this._avatarURL = avatarURL;
         this._notifsEnabled = notifsEnabled;
-        this._selectedTodayListIndex = 0;
+        this._selectedTodayListIndex = selectedTodayListIndex;
 
         this._rootFolders = [];
         this._listMap = new Map<string, List>();
+
+        this._dateLastRotatedTodayLists = dateLastRotatedTodayLists;
 
 
         this._todayInfo = new TodayInfo(this.getTodayLists());
@@ -63,11 +68,15 @@ export class User {
     get selectedTodayListIndex(): number { return this._selectedTodayListIndex; }
     set selectedTodayListIndex(value: number) { this._selectedTodayListIndex = value; }
 
+    get dateLastRotatedTodayLists(): Date | null { return this._dateLastRotatedTodayLists; }
+    set dateLastRotatedTodayLists(value: Date | null) { this._dateLastRotatedTodayLists = value; }
+
     get rootFolders(): Folder[] { return this._rootFolders; }
     set rootFolders(value: Folder[]) { this._rootFolders = value; }
 
     get listMap(): Map<string, List> { return this._listMap; }
     set listMap(value: Map<string, List>) { this._listMap = value; }
+
 
     // Method to save changes to the database
     async save(): Promise<void> {
@@ -173,6 +182,17 @@ export class User {
         const seen = new Set<string>();
         return Array.from(this._listMap.values())
           .filter(l => l.today && !seen.has(l.id) && seen.add(l.id));
+    }
+
+    public getNotificationLists() {
+        return Array.from(this._listMap.values())
+            .filter(l => l.notifyOnNew || l.notifyTime);
+    }
+
+    public getCurrentItemLists() {
+        // if it's in today OR it has notifications on
+        return Array.from(this._listMap.values())
+            .filter(l => l.today || l.notifyOnNew || l.notifyTime);
     }
 
     public getPublicLists() {
