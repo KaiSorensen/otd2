@@ -61,6 +61,7 @@ export async function scheduleBatchNotificationsForList(list: List, count: numbe
 
   while (scheduled < count && idx < items.length) {
     const item = items[idx];
+    const notificationId = `notif-${list.id}-${item.id}`;
     const trigger: TimestampTrigger = {
       type: TriggerType.TIMESTAMP,
       timestamp: fireDate.getTime(),
@@ -68,6 +69,7 @@ export async function scheduleBatchNotificationsForList(list: List, count: numbe
     console.log('Scheduling notification for', item.content, fireDate);
     await notifee.createTriggerNotification(
       {
+        id: notificationId,
         title: list.title || 'Of The Day',
         body: item.content.slice(0, 200) + (item.content.length > 200 ? '…' : ''),
         android: { channelId: 'default' },
@@ -91,8 +93,8 @@ export async function cancelNotificationsForList(list: List) {
   for (const n of notifications) {
     if (
       n.notification &&
-      (n.notification.title === list.title || n.notification.title === 'Of The Day') &&
-      n.notification.id
+      n.notification.id &&
+      n.notification.id.startsWith(`notif-${list.id}-`)
     ) {
       await notifee.cancelNotification(n.notification.id);
     }
@@ -100,19 +102,30 @@ export async function cancelNotificationsForList(list: List) {
 }
 
 export function registerNotificationListeners(onNotificationPress: (listId: string, itemId: string) => void) {
-  const fgUnsub = notifee.onForegroundEvent(({ type, detail }) => {
+  const checkItemExists = async (listId: string, itemId: string) => {
+    try {
+      const { retrieveList } = await import('../wdb/wdbService');
+      const list = await retrieveList(listId);
+      if (!list) return false;
+      const items = await (await import('../wdb/wdbService')).getItemsInList(list);
+      return items.some((i: any) => i.id === itemId);
+    } catch {
+      return false;
+    }
+  };
+  const fgUnsub = notifee.onForegroundEvent(async ({ type, detail }) => {
     if (type === EventType.PRESS && detail.notification?.data) {
       const { listId, itemId } = detail.notification.data;
-      if (listId && itemId) {
-        onNotificationPress(String(listId), String(itemId));
+      if (typeof listId === 'string' && typeof itemId === 'string' && await checkItemExists(listId, itemId)) {
+        onNotificationPress(listId, itemId);
       }
     }
   }) as unknown as () => void;
   const bgUnsub = notifee.onBackgroundEvent(async ({ type, detail }) => {
     if (type === EventType.PRESS && detail.notification?.data) {
       const { listId, itemId } = detail.notification.data;
-      if (listId && itemId) {
-        onNotificationPress(String(listId), String(itemId));
+      if (typeof listId === 'string' && typeof itemId === 'string' && await checkItemExists(listId, itemId)) {
+        onNotificationPress(listId, itemId);
       }
     }
   }) as unknown as () => void;

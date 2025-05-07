@@ -47,9 +47,16 @@ const TodayScreen = () => {
         const info = new TodayInfo(lists);
         await info.refreshTodayItems();
         setTodayInfo(info);
-        
-        // Use the selected list index from the user
-        setSelectedListIndex(currentUser.selectedTodayListIndex);
+        // Use the selected list index from the user, but default to 0 if invalid
+        let idx = 0;
+        if (
+          typeof currentUser.selectedTodayListIndex === 'number' &&
+          currentUser.selectedTodayListIndex >= 0 &&
+          currentUser.selectedTodayListIndex < lists.length
+        ) {
+          idx = currentUser.selectedTodayListIndex;
+        }
+        setSelectedListIndex(idx);
       } catch (error) {
         console.error('Error fetching today info:', error);
       } finally {
@@ -84,12 +91,10 @@ const TodayScreen = () => {
     const { listId, itemId, fromNotification } = route.params || {};
     if (fromNotification && listId && itemId) {
       const listIdx = todayInfo.todayLists.findIndex(l => l.id === listId);
-      if (listIdx !== -1) {
-        setSelectedListIndex(listIdx);
-        const item = todayInfo.getItemForList(listId);
-        if (item && item.id === itemId) {
-          setDisplayedItem(item);
-        }
+      setSelectedListIndex(listIdx !== -1 ? listIdx : 0);
+      const item = todayInfo.getItemForList(listId);
+      if (item && item.id === itemId) {
+        setDisplayedItem(item);
       }
     }
   }, [route, todayInfo]);
