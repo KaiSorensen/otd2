@@ -1,6 +1,6 @@
 // notificationManager.ts
-import notifee, { AndroidImportance, TriggerType, TimestampTrigger } from '@notifee/react-native';
-import { List, DayOfWeek } from '../classes/List';
+import notifee, { AndroidImportance, TriggerType, TimestampTrigger, EventType } from '@notifee/react-native';
+import { List } from '../classes/List';
 
 export async function initNotifications() {
   await notifee.requestPermission();
@@ -71,6 +71,7 @@ export async function scheduleBatchNotificationsForList(list: List, count: numbe
         title: list.title || 'Of The Day',
         body: item.content.slice(0, 200) + (item.content.length > 200 ? '…' : ''),
         android: { channelId: 'default' },
+        data: { listId: list.id, itemId: item.id },
       },
       trigger
     );
@@ -96,4 +97,27 @@ export async function cancelNotificationsForList(list: List) {
       await notifee.cancelNotification(n.notification.id);
     }
   }
+}
+
+export function registerNotificationListeners(onNotificationPress: (listId: string, itemId: string) => void) {
+  const fgUnsub = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS && detail.notification?.data) {
+      const { listId, itemId } = detail.notification.data;
+      if (listId && itemId) {
+        onNotificationPress(String(listId), String(itemId));
+      }
+    }
+  }) as unknown as () => void;
+  const bgUnsub = notifee.onBackgroundEvent(async ({ type, detail }) => {
+    if (type === EventType.PRESS && detail.notification?.data) {
+      const { listId, itemId } = detail.notification.data;
+      if (listId && itemId) {
+        onNotificationPress(String(listId), String(itemId));
+      }
+    }
+  }) as unknown as () => void;
+  return () => {
+    if (typeof fgUnsub === 'function') fgUnsub();
+    if (typeof bgUnsub === 'function') bgUnsub();
+  };
 }

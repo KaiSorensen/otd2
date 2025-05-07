@@ -101,6 +101,7 @@ const SortOrderDropdown: React.FC<SortOrderDropdownProps> = ({ value, onChange, 
 interface ListScreenProps {
   list: List;
   onBack?: () => void;
+  initialItemId?: string | null;
 }
 
 // Add new AddToLibraryModal component
@@ -205,7 +206,7 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
   );
 };
 
-const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) => {
+const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, initialItemId }) => {
   const { currentUser, forceUserUpdate } = useAuth();
   const { colors, isDarkMode } = useColors();
   const [list, setList] = useState<List>(initialList);
@@ -262,6 +263,14 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack }) =>
       fetchUserFolders();
     }
   }, [isAddToLibraryModalVisible, currentUser]);
+
+  // Select initial item if initialItemId is provided
+  useEffect(() => {
+    if (initialItemId && items.length > 0) {
+      const found = items.find(i => i.id === initialItemId);
+      if (found) setSelectedItem(found);
+    }
+  }, [initialItemId, items]);
 
   // Function to fetch items
   const fetchItems = async () => {

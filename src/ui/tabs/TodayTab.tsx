@@ -18,6 +18,7 @@ import { useColors } from '../../contexts/ColorContext';
 import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useRoute } from '@react-navigation/native';
 
 const TodayScreen = () => {
   const { currentUser, loading, forceUserUpdate } = useAuth();
@@ -29,6 +30,7 @@ const TodayScreen = () => {
   const [displayedItem, setDisplayedItem] = useState<Item | null>(null);
   const chipsScrollViewRef = useRef<ScrollView>(null);
   const { width } = Dimensions.get('window');
+  const route = useRoute();
 
   // Fetch today info on component mount or when user changes
   useEffect(() => {
@@ -74,6 +76,23 @@ const TodayScreen = () => {
 
     updateDisplayedItem();
   }, [todayInfo, selectedListIndex]);
+
+  // Handle navigation from notification
+  useEffect(() => {
+    if (!todayInfo) return;
+    // @ts-ignore
+    const { listId, itemId, fromNotification } = route.params || {};
+    if (fromNotification && listId && itemId) {
+      const listIdx = todayInfo.todayLists.findIndex(l => l.id === listId);
+      if (listIdx !== -1) {
+        setSelectedListIndex(listIdx);
+        const item = todayInfo.getItemForList(listId);
+        if (item && item.id === itemId) {
+          setDisplayedItem(item);
+        }
+      }
+    }
+  }, [route, todayInfo]);
 
   // Handle chip selection
   const handleChipPress = (index: number) => {

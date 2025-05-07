@@ -22,6 +22,7 @@ import ListScreen from '../screens/ListScreen';
 import CreateFolderModal from '../components/CreateFolderModal';
 import CreateListModal from '../components/CreateListModal';
 import { deleteFolder } from '../../wdb/wdbService';
+import { useRoute } from '@react-navigation/native';
 
 const LibraryScreen = () => {
   const { currentUser, loading } = useAuth();
@@ -30,9 +31,11 @@ const LibraryScreen = () => {
   const [allExpanded, setAllExpanded] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedList, setSelectedList] = useState<List | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
+  const route = useRoute();
 
   // Add useEffect to refresh expanded folders when currentUser changes
   useEffect(() => {
@@ -62,6 +65,19 @@ const LibraryScreen = () => {
       }
     }
   }, [currentUser, selectedList, forceUpdate]);
+
+  // Handle navigation from notification
+  useEffect(() => {
+    // @ts-ignore
+    const { listId, itemId, fromNotification } = route.params || {};
+    if (fromNotification && listId) {
+      const list = currentUser?.getList(listId);
+      if (list) {
+        setSelectedList(list);
+        if (itemId) setSelectedItemId(itemId);
+      }
+    }
+  }, [route, currentUser]);
 
   const toggleFolder = (folderId: string) => {
     const newExpandedFolders = new Set(expandedFolders);
@@ -229,7 +245,7 @@ const LibraryScreen = () => {
   };
 
   if (selectedList) {
-    return <ListScreen list={selectedList} onBack={handleBackFromListScreen} />;
+    return <ListScreen list={selectedList} onBack={handleBackFromListScreen} initialItemId={selectedItemId} />;
   }
 
   return (
