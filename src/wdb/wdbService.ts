@@ -639,6 +639,7 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
       if (updates.email) raw.email = updates.email;
       if (updates.avatarURL) raw.avatar_url = updates.avatarURL;
       if (updates.notifsEnabled !== undefined) raw.notifs_enabled = updates.notifsEnabled;
+      if (updates.selectedTodayListIndex !== undefined) raw.selected_today_list_index = updates.selectedTodayListIndex;
       raw.updated_at = new Date();
     });
   });

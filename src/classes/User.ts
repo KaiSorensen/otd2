@@ -84,7 +84,8 @@ export class User {
             username: this._username,
             email: this._email,
             avatarURL: this._avatarURL,
-            notifsEnabled: this._notifsEnabled
+            notifsEnabled: this._notifsEnabled,
+            selectedTodayListIndex: this._selectedTodayListIndex
         });
     }
 

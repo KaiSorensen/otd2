@@ -100,7 +100,7 @@ const TodayScreen = () => {
   }, [route, todayInfo]);
 
   // Handle chip selection
-  const handleChipPress = (index: number) => {
+  const handleChipPress = async (index: number) => {
     if (!todayInfo || !currentUser) return;
     
     // If the chip is already selected, open the list view
@@ -111,6 +111,8 @@ const TodayScreen = () => {
     
     setSelectedListIndex(index);
     currentUser.selectedTodayListIndex = index;
+    await currentUser.save();
+    await forceUserUpdate();
     scrollToSelectedChip(index);
     
     // Update displayed item for the selected list
@@ -127,6 +129,8 @@ const TodayScreen = () => {
     setLoadingLists(true);
     
     try {
+      // Store the currently selected list ID
+      const prevSelectedListId = todayInfo.todayLists[selectedListIndex]?.id;
       // Process lists one by one, awaiting each operation
       for (const list of todayInfo.todayLists) {
         await list.rotateTodayItem(currentUser.id, "next");
@@ -138,15 +142,26 @@ const TodayScreen = () => {
       await info.refreshTodayItems();
       setTodayInfo(info);
 
+      // Find the new index of the previously selected list
+      let newIndex = 0;
+      if (prevSelectedListId) {
+        const idx = info.todayLists.findIndex(l => l.id === prevSelectedListId);
+        if (idx !== -1) newIndex = idx;
+      }
+      setSelectedListIndex(newIndex);
+      currentUser.selectedTodayListIndex = newIndex;
+      await currentUser.save();
+      await forceUserUpdate();
+
       // Update the displayed item for the current list
-      const selectedList = info.todayLists[selectedListIndex];
+      const selectedList = info.todayLists[newIndex];
       if (selectedList) {
         const item = info.getItemForList(selectedList.id);
         setDisplayedItem(item);
       }
-
+    
       // Force UI update
-      await forceUserUpdate();
+      // await forceUserUpdate();
     } catch (error) {
       console.error('Error rotating items:', error);
     } finally {
