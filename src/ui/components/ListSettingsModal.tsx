@@ -9,6 +9,7 @@ import {
   Switch,
   Platform,
   Alert,
+  TextInput,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { List, DayOfWeek } from '../../classes/List';
@@ -175,6 +176,8 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
   
   // Local state for immediate feedback
   const [localSettings, setLocalSettings] = useState({
+    title: list.title,
+    description: list.description,
     isPublic: list.isPublic,
     today: list.today,
     notifyOnNew: list.notifyOnNew,
@@ -187,6 +190,8 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
   // Update local state when modal opens or list changes
   useEffect(() => {
     setLocalSettings({
+      title: list.title,
+      description: list.description,
       isPublic: list.isPublic,
       today: list.today,
       notifyOnNew: list.notifyOnNew,
@@ -377,6 +382,27 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Owner Settings</Text>
                 <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Title</Text>
+                  <TextInput
+                    style={[styles.settingValue, { color: colors.textPrimary, flex: 2, borderWidth: 1, borderColor: colors.divider, borderRadius: 6, paddingHorizontal: 8, backgroundColor: colors.backgroundSecondary }]}
+                    value={localSettings.title || ''}
+                    onChangeText={text => handleSettingChange('title', text)}
+                    placeholder="List name"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={[styles.settingRow, { borderBottomColor: colors.divider, alignItems: 'flex-start' }]}>
+                  <Text style={[styles.settingLabel, { color: colors.textPrimary, marginTop: 8 }]}>Description</Text>
+                  <TextInput
+                    style={[styles.settingValue, { color: colors.textPrimary, flex: 2, borderWidth: 1, borderColor: colors.divider, borderRadius: 6, paddingHorizontal: 8, backgroundColor: colors.backgroundSecondary, minHeight: 48, textAlignVertical: 'top' }]}
+                    value={localSettings.description || ''}
+                    onChangeText={text => handleSettingChange('description', text)}
+                    placeholder="Description"
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                  />
+                </View>
+                <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
                   <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Public</Text>
                   <Switch
                     value={localSettings.isPublic}
@@ -384,12 +410,6 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
                     trackColor={{ false: colors.backgroundSecondary, true: `${colors.primary}80` }}
                     thumbColor={localSettings.isPublic ? colors.primary : colors.backgroundTertiary}
                   />
-                </View>
-                <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
-                  <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Description</Text>
-                  <Text style={[styles.settingValue, { color: colors.textSecondary }]} numberOfLines={2}>
-                    {list.description || 'No description'}
-                  </Text>
                 </View>
                 <View style={[styles.settingRow, { borderBottomColor: colors.divider }]}>
                   <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Cover Image</Text>
