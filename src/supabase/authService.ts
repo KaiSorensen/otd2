@@ -290,7 +290,7 @@ export const createUserFromSupabaseUser = (supabaseUser: any): User => {
     supabaseUser.user_metadata?.avatar_url || null,
     true,
     0,
-    null
+    new Date()
   );
 };
 

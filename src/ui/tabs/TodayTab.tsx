@@ -18,7 +18,7 @@ import { useColors } from '../../contexts/ColorContext';
 import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 
 const TodayScreen = () => {
   const { currentUser, loading, forceUserUpdate } = useAuth();
@@ -31,6 +31,7 @@ const TodayScreen = () => {
   const chipsScrollViewRef = useRef<ScrollView>(null);
   const { width } = Dimensions.get('window');
   const route = useRoute();
+  const navigation = useNavigation();
 
   // Fetch today info on component mount or when user changes
   useEffect(() => {
@@ -96,8 +97,10 @@ const TodayScreen = () => {
       if (item && item.id === itemId) {
         setDisplayedItem(item);
       }
+      // Clear notification params so user can switch lists
+      (navigation as any).setParams({ fromNotification: undefined, listId: undefined, itemId: undefined });
     }
-  }, [route, todayInfo]);
+  }, [route, todayInfo, navigation]);
 
   // Handle chip selection
   const handleChipPress = async (index: number) => {

@@ -275,7 +275,7 @@ export async function syncUserData() {
                 if (!Array.isArray(value)) value = [];
               }
               // Convert date fields to ISO strings
-              if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
+              if (["created_at", "updated_at", "notify_time", "date_last_rotated_today_lists"].includes(watermelonField)) {
                 value = value ? new Date(value).toISOString() : null;
               }
               // // Ensure sortorder has a valid value for librarylists

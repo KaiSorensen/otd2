@@ -64,6 +64,8 @@ export async function storeNewUser(user: User) {
       raw.notifs_enabled = user.notifsEnabled;
       raw.created_at = new Date();
       raw.updated_at = new Date();
+      raw.date_last_rotated_today_lists = new Date();
+      raw.selected_today_list_index = 0;
     });
   });
   // console.log('User stored in k;ajsdhfi;asufhf');
@@ -559,14 +561,36 @@ export async function initializeTodayItem(list: List) {
 }
 
 export async function syncDateLastRotatedTodayLists(user: User) {
-  const lastUpdated = user.dateLastRotatedTodayLists
-  // we will go by the day in the date. If the device time says that the day has changed, we will rotate the items
+  if (!user.dateLastRotatedTodayLists) {
+    user.dateLastRotatedTodayLists = new Date();
+    await updateUser(user.id, { dateLastRotatedTodayLists: user.dateLastRotatedTodayLists });
+  }
+
+  const lastUpdated = user.dateLastRotatedTodayLists;
   const today = new Date();
-  const lastUpdatedDay = lastUpdated ? new Date(lastUpdated) : new Date(0);
-  if (today.getDate() !== lastUpdatedDay.getDate()) {
+
+  const todayDateOnly = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+  const lastUpdatedDateOnly = new Date(
+    lastUpdated.getFullYear(),
+    lastUpdated.getMonth(),
+    lastUpdated.getDate()
+  );
+
+  console.log("Last rotated date:", lastUpdatedDateOnly.toDateString());
+  console.log("Today's date:", todayDateOnly.toDateString());
+
+  if (todayDateOnly.getTime() !== lastUpdatedDateOnly.getTime()) {
+    console.log("Date has changed. Rotating items.");
     rotateTodayItemsAllLists(user, 1);
     user.dateLastRotatedTodayLists = today;
-    await updateUser(user.id, { dateLastRotatedTodayLists: user.dateLastRotatedTodayLists });
+    await updateUser(user.id, { dateLastRotatedTodayLists: today });
+    console.log("Updated user's dateLastRotatedTodayLists to:", today.toISOString());
+  } else {
+    console.log("Date has not changed. No rotation needed.");
   }
 }
 
@@ -640,6 +664,7 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
       if (updates.avatarURL) raw.avatar_url = updates.avatarURL;
       if (updates.notifsEnabled !== undefined) raw.notifs_enabled = updates.notifsEnabled;
       if (updates.selectedTodayListIndex !== undefined) raw.selected_today_list_index = updates.selectedTodayListIndex;
+      if (updates.dateLastRotatedTodayLists !== undefined) raw.date_last_rotated_today_lists = updates.dateLastRotatedTodayLists;
       raw.updated_at = new Date();
     });
   });

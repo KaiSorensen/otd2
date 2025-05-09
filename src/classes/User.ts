@@ -1,4 +1,4 @@
-import { retrievePopulatedUser, updateUser, switchFolderOfList } from '../wdb/wdbService';
+import { retrievePopulatedUser, updateUser, switchFolderOfList, syncDateLastRotatedTodayLists } from '../wdb/wdbService';
 import { Folder } from './Folder';
 import { List } from './List';
 import { TodayInfo } from './TodayInfo';
@@ -44,6 +44,7 @@ export class User {
 
 
         this._todayInfo = new TodayInfo(this.getTodayLists());
+        syncDateLastRotatedTodayLists(this);
     }
 
     get todayInfo(): TodayInfo { return this._todayInfo; }
