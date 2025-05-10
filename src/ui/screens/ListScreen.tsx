@@ -266,24 +266,20 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     }
   }, [isAddToLibraryModalVisible, currentUser]);
 
-  // Handle navigation from notification
+  // Open item if initialItemId is provided (e.g. from notification)
   useEffect(() => {
-    // @ts-ignore
-    const { fromNotification, itemId } = route.params || {};
     if (
-      fromNotification &&
-      itemId &&
+      initialItemId &&
       items.length > 0 &&
       !hasHandledNotification
     ) {
-      const found = items.find(i => i.id === itemId);
+      const found = items.find(i => i.id === initialItemId);
       if (found) {
         (navigation as any).navigate('Item', { item: found, canEdit: false });
-        (navigation as any).setParams({ fromNotification: undefined, listId: undefined, itemId: undefined });
       }
       setHasHandledNotification(true);
     }
-  }, [route, items, navigation, hasHandledNotification]);
+  }, [initialItemId, items, navigation, hasHandledNotification]);
 
   // When the list changes (e.g. navigating to a new list), reset the notification flag
   useEffect(() => {

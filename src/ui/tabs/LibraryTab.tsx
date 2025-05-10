@@ -62,7 +62,7 @@ const LibraryScreen = () => {
     if (fromNotification && listId) {
       const list = currentUser?.getList(listId);
       if (list) {
-        (navigation as any).navigate('List', { list, fromNotification, itemId });
+        (navigation as any).navigate('List', { list, initialItemId: itemId });
       }
     }
   }, [route, currentUser, navigation]);

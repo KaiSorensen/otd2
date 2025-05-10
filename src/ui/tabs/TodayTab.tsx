@@ -103,7 +103,13 @@ const TodayScreen = () => {
     await currentUser.save();
     await forceUserUpdate();
     scrollToSelectedChip(index);
-    (navigation as any).navigate('List', { list: todayInfo.todayLists[index] });
+    (navigation as any).reset({
+      index: 1,
+      routes: [
+        { name: 'Tabs', params: { screen: 'Today' } },
+        { name: 'List', params: { list: todayInfo.todayLists[index] } }
+      ]
+    });
   };
 
   // Update handleRotateAllItems to just update the displayed item
