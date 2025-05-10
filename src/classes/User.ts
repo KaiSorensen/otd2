@@ -86,7 +86,8 @@ export class User {
             email: this._email,
             avatarURL: this._avatarURL,
             notifsEnabled: this._notifsEnabled,
-            selectedTodayListIndex: this._selectedTodayListIndex
+            selectedTodayListIndex: this._selectedTodayListIndex,
+            dateLastRotatedTodayLists: this._dateLastRotatedTodayLists
         });
     }
 

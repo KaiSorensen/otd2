@@ -98,11 +98,15 @@ const TodayScreen = () => {
   // Handle chip press to open ListScreen and update selected list
   const handleChipPress = async (index: number) => {
     if (!todayInfo || !currentUser) return;
-    setSelectedListIndex(index);
-    currentUser.selectedTodayListIndex = index;
-    await currentUser.save();
-    await forceUserUpdate();
-    scrollToSelectedChip(index);
+    if (selectedListIndex !== index) {
+      setSelectedListIndex(index);
+      currentUser.selectedTodayListIndex = index;
+      currentUser.save();
+      // await forceUserUpdate(); // not needed because we already set the value two lines before
+      scrollToSelectedChip(index);
+      return;
+    }
+    // If already selected, open ListScreen
     (navigation as any).reset({
       index: 1,
       routes: [
