@@ -16,7 +16,7 @@ export default class User extends Model {
   @field('avatar_url') avatar_url!: string | null
   @field('notifs_enabled') notifs_enabled!: boolean
   @field('selected_today_list_index') selected_today_list_index!: number
-  @field('date_last_rotated_today_lists') date_last_rotated_today_lists!: Date | null
+  @date('date_last_rotated_today_lists') date_last_rotated_today_lists!: Date | null
   @date('created_at') created_at!: Date
   @date('updated_at') updated_at!: Date
 

@@ -27,6 +27,7 @@ import { User } from '../../classes/User';
 import { useAuth } from '../../contexts/UserContext';
 import { useColors } from '../../contexts/ColorContext';
 import { useNetwork } from '../../contexts/NetworkContext';
+import { useNavigation } from '@react-navigation/native';
 import debounce from 'lodash.debounce';
 import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
@@ -50,13 +51,11 @@ const SearchScreen = () => {
   const { currentUser } = useAuth();
   const { colors } = useColors();
   const { isInternetReachable } = useNetwork();
+  const navigation = useNavigation();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>(null);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedList, setSelectedList] = useState<List | null>(null);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEasterEgg, setIsEasterEgg] = useState(false);
   const pulseAnim = useState(new Animated.Value(1))[0];
 
@@ -191,7 +190,7 @@ const SearchScreen = () => {
   const renderListResult = (list: List) => (
     <TouchableOpacity
       style={[styles.resultItem, { backgroundColor: colors.card, shadowColor: colors.shadow }]}
-      onPress={() => setSelectedList(list)}
+      onPress={() => (navigation as any).navigate('List', { list })}
     >
       {list.coverImageURL && (
         <Image
@@ -215,9 +214,8 @@ const SearchScreen = () => {
       <TouchableOpacity
         style={styles.actionButton}
         onPress={(e) => {
-          e.stopPropagation(); // Prevent triggering the parent onPress
-          // Navigate to list
-          setSelectedList(list);
+          e.stopPropagation();
+          (navigation as any).navigate('List', { list });
         }}
       >
         <Icon name="arrow-forward-outline" size={24} color={colors.primary} />
@@ -229,9 +227,7 @@ const SearchScreen = () => {
     return (
       <TouchableOpacity
         style={[styles.resultItem, { backgroundColor: colors.card, shadowColor: colors.shadow }]}
-        onPress={() => {
-          setSelectedItem(item);
-        }}
+        onPress={() => (navigation as any).navigate('Item', { item })}
       >
         <View style={styles.resultContent}>
           <Text style={[styles.resultDescription, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -245,7 +241,7 @@ const SearchScreen = () => {
           style={styles.actionButton}
           onPress={(e) => {
             e.stopPropagation();
-            setSelectedItem(item);
+            (navigation as any).navigate('Item', { item });
           }}
         >
           <Icon name="arrow-forward-outline" size={24} color={colors.primary} />
@@ -269,7 +265,7 @@ const SearchScreen = () => {
       </View>
       <TouchableOpacity
         style={styles.actionButton}
-        onPress={() => setSelectedUser(user)}
+        onPress={() => (navigation as any).navigate('User', { userID: user.id })}
       >
         <Icon name="arrow-forward-outline" size={24} color={colors.primary} />
       </TouchableOpacity>
@@ -289,42 +285,6 @@ const SearchScreen = () => {
         return null;
     }
   };
-
-  const handleBackFromListScreen = () => {
-    setSelectedList(null);
-  };
-
-  const handleBackFromItemScreen = () => {
-    setSelectedItem(null);
-  };
-
-  const handleBackFromUserScreen = () => {
-    setSelectedUser(null);
-  };
-
-  // If a user is selected, show the UserScreen
-  if (selectedUser) {
-    return <UserScreen userID={selectedUser.id} onBack={handleBackFromUserScreen} />;
-  }
-
-  // If a list is selected, show the ListScreen
-  if (selectedList) {
-    return <ListScreen list={selectedList} onBack={handleBackFromListScreen} />;
-  }
-
-  // If an item is selected, show the ItemScreen
-  if (selectedItem) {
-    // // console.log('Showing ItemScreen for item:', selectedItem.id);
-    return (
-      <ItemScreen
-        item={selectedItem}
-        onBack={() => {
-          // // console.log('Back from ItemScreen');
-          setSelectedItem(null);
-        }}
-      />
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>

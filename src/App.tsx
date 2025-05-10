@@ -40,9 +40,17 @@ const AppContent = () => {
               name: 'Main',
               state: {
                 routes: [
-                  { name: 'Today', params: { listId, itemId, fromNotification: true } },
-                  { name: 'Library' },
-                  { name: 'Search' }
+                  {
+                    name: 'Tabs',
+                    state: {
+                      routes: [
+                        { name: 'Today', params: { listId, itemId, fromNotification: true } },
+                        { name: 'Library' },
+                        { name: 'Search' }
+                      ],
+                      index: 0
+                    }
+                  }
                 ],
                 index: 0
               }
@@ -57,11 +65,29 @@ const AppContent = () => {
               name: 'Main',
               state: {
                 routes: [
-                  { name: 'Today' },
-                  { name: 'Library', params: { listId, itemId, fromNotification: true } },
-                  { name: 'Search' }
+                  {
+                    name: 'Tabs',
+                    state: {
+                      routes: [
+                        { name: 'Today' },
+                        {
+                          name: 'Library',
+                          params: { fromNotification: true, listId, itemId },
+                          state: {
+                            routes: [
+                              { name: 'List', params: { list: currentUser.getList(listId), fromNotification: true, initialItemId: itemId } },
+                              { name: 'Item', params: { item: { id: itemId }, canEdit: false } }
+                            ],
+                            index: 1
+                          }
+                        },
+                        { name: 'Search' }
+                      ],
+                      index: 1
+                    }
+                  }
                 ],
-                index: 1
+                index: 0
               }
             }
           ]

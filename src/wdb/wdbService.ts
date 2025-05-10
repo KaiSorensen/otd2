@@ -562,6 +562,7 @@ export async function initializeTodayItem(list: List) {
 
 export async function syncDateLastRotatedTodayLists(user: User) {
   if (!user.dateLastRotatedTodayLists) {
+    console.log('no dateLastRotatedTodayLists found, setting to now');
     user.dateLastRotatedTodayLists = new Date();
     await updateUser(user.id, { dateLastRotatedTodayLists: user.dateLastRotatedTodayLists });
   }

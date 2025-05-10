@@ -22,7 +22,7 @@ import ListScreen from '../screens/ListScreen';
 import CreateFolderModal from '../components/CreateFolderModal';
 import CreateListModal from '../components/CreateListModal';
 import { deleteFolder } from '../../wdb/wdbService';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 
 const LibraryScreen = () => {
   const { currentUser, loading } = useAuth();
@@ -30,12 +30,11 @@ const LibraryScreen = () => {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [allExpanded, setAllExpanded] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedList, setSelectedList] = useState<List | null>(null);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   const route = useRoute();
+  const navigation = useNavigation();
 
   // Add useEffect to refresh expanded folders when currentUser changes
   useEffect(() => {
@@ -56,16 +55,6 @@ const LibraryScreen = () => {
     }
   }, [currentUser]);
 
-  // Add useEffect to refresh selectedList when currentUser changes
-  useEffect(() => {
-    if (selectedList && currentUser) {
-      const updatedList = currentUser.listMap.get(selectedList.id);
-      if (!updatedList) {
-        setSelectedList(null);
-      }
-    }
-  }, [currentUser, selectedList, forceUpdate]);
-
   // Handle navigation from notification
   useEffect(() => {
     // @ts-ignore
@@ -73,11 +62,10 @@ const LibraryScreen = () => {
     if (fromNotification && listId) {
       const list = currentUser?.getList(listId);
       if (list) {
-        setSelectedList(list);
-        if (itemId) setSelectedItemId(itemId);
+        (navigation as any).navigate('List', { list, fromNotification, itemId });
       }
     }
-  }, [route, currentUser]);
+  }, [route, currentUser, navigation]);
 
   const toggleFolder = (folderId: string) => {
     const newExpandedFolders = new Set(expandedFolders);
@@ -120,7 +108,7 @@ const LibraryScreen = () => {
     <TouchableOpacity
       key={list.id}
       style={[styles.listItem, { paddingLeft, borderBottomColor: colors.divider }]}
-      onPress={() => setSelectedList(list)}
+      onPress={() => (navigation as any).navigate('List', { list })}
     >
       <View style={styles.listItemContent}>
         {list.coverImageURL ? (
@@ -229,7 +217,7 @@ const LibraryScreen = () => {
   };
 
   const handleBackFromListScreen = () => {
-    setSelectedList(null);
+    // This function is no longer used
   };
 
   const handleFolderCreated = (folder: Folder) => {
@@ -243,10 +231,6 @@ const LibraryScreen = () => {
       currentUser.addList(list);
     }
   };
-
-  if (selectedList) {
-    return <ListScreen list={selectedList} onBack={handleBackFromListScreen} initialItemId={selectedItemId} />;
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>

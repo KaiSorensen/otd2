@@ -26,12 +26,11 @@ const TodayScreen = () => {
   const [todayInfo, setTodayInfo] = useState<TodayInfo | null>(null);
   const [selectedListIndex, setSelectedListIndex] = useState<number>(0);
   const [loadingLists, setLoadingLists] = useState<boolean>(true);
-  const [selectedListForView, setSelectedListForView] = useState<List | null>(null);
-  const [displayedItem, setDisplayedItem] = useState<Item | null>(null);
   const chipsScrollViewRef = useRef<ScrollView>(null);
   const { width } = Dimensions.get('window');
   const route = useRoute();
   const navigation = useNavigation();
+  const [displayedItem, setDisplayedItem] = useState<Item | null>(null);
 
   // Fetch today info on component mount or when user changes
   useEffect(() => {
@@ -70,21 +69,6 @@ const TodayScreen = () => {
     }
   }, [currentUser, loading, forceUserUpdate]);
 
-  // Update displayed item when todayInfo changes or items load
-  useEffect(() => {
-    const updateDisplayedItem = async () => {
-      if (todayInfo && todayInfo.todayLists.length > 0) {
-        const selectedList = todayInfo.todayLists[selectedListIndex];
-        if (selectedList) {
-          const item = todayInfo.getItemForList(selectedList.id);
-          setDisplayedItem(item);
-        }
-      }
-    };
-
-    updateDisplayedItem();
-  }, [todayInfo, selectedListIndex]);
-
   // Handle navigation from notification
   useEffect(() => {
     if (!todayInfo) return;
@@ -93,59 +77,48 @@ const TodayScreen = () => {
     if (fromNotification && listId && itemId) {
       const listIdx = todayInfo.todayLists.findIndex(l => l.id === listId);
       setSelectedListIndex(listIdx !== -1 ? listIdx : 0);
-      const item = todayInfo.getItemForList(listId);
-      if (item && item.id === itemId) {
-        setDisplayedItem(item);
-      }
       // Clear notification params so user can switch lists
       (navigation as any).setParams({ fromNotification: undefined, listId: undefined, itemId: undefined });
     }
   }, [route, todayInfo, navigation]);
 
-  // Handle chip selection
+  // Update displayed item when todayInfo or selectedListIndex changes
+  useEffect(() => {
+    if (todayInfo && todayInfo.todayLists.length > 0) {
+      const selectedList = todayInfo.todayLists[selectedListIndex];
+      if (selectedList) {
+        const item = todayInfo.getItemForList(selectedList.id);
+        setDisplayedItem(item);
+      }
+    } else {
+      setDisplayedItem(null);
+    }
+  }, [todayInfo, selectedListIndex]);
+
+  // Handle chip press to open ListScreen and update selected list
   const handleChipPress = async (index: number) => {
     if (!todayInfo || !currentUser) return;
-    
-    // If the chip is already selected, open the list view
-    if (selectedListIndex === index) {
-      setSelectedListForView(todayInfo.todayLists[index]);
-      return;
-    }
-    
     setSelectedListIndex(index);
     currentUser.selectedTodayListIndex = index;
     await currentUser.save();
     await forceUserUpdate();
     scrollToSelectedChip(index);
-    
-    // Update displayed item for the selected list
-    const selectedList = todayInfo.todayLists[index];
-    const selectedItem = todayInfo.getItemForList(selectedList.id);
-    setDisplayedItem(selectedItem);
+    (navigation as any).navigate('List', { list: todayInfo.todayLists[index] });
   };
 
-  // Handle rotating all items
+  // Update handleRotateAllItems to just update the displayed item
   const handleRotateAllItems = async () => {
     if (!todayInfo || !currentUser || loadingLists) return;
-    
-    // Set loading state to prevent rapid button presses
     setLoadingLists(true);
-    
     try {
-      // Store the currently selected list ID
       const prevSelectedListId = todayInfo.todayLists[selectedListIndex]?.id;
-      // Process lists one by one, awaiting each operation
       for (const list of todayInfo.todayLists) {
         await list.rotateTodayItem(currentUser.id, "next");
       }
-
-      // Refresh the today info
       const lists = currentUser.getTodayLists();
       const info = new TodayInfo(lists);
       await info.refreshTodayItems();
       setTodayInfo(info);
-
-      // Find the new index of the previously selected list
       let newIndex = 0;
       if (prevSelectedListId) {
         const idx = info.todayLists.findIndex(l => l.id === prevSelectedListId);
@@ -155,16 +128,12 @@ const TodayScreen = () => {
       currentUser.selectedTodayListIndex = newIndex;
       await currentUser.save();
       await forceUserUpdate();
-
       // Update the displayed item for the current list
       const selectedList = info.todayLists[newIndex];
       if (selectedList) {
         const item = info.getItemForList(selectedList.id);
         setDisplayedItem(item);
       }
-    
-      // Force UI update
-      // await forceUserUpdate();
     } catch (error) {
       console.error('Error rotating items:', error);
     } finally {
@@ -184,15 +153,6 @@ const TodayScreen = () => {
       });
     }
   };
-
-  const handleBackFromListScreen = () => {
-    setSelectedListForView(null);
-  };
-
-  // Conditionally render ListScreen if a list is selected for viewing
-  if (selectedListForView) {
-    return <ListScreen list={selectedListForView} onBack={handleBackFromListScreen} />;
-  }
 
   // Show loading state while fetching user or lists
   if (loading || loadingLists) {
@@ -257,10 +217,8 @@ const TodayScreen = () => {
           <Icon name="refresh-outline" size={24} color="white" />
         </TouchableOpacity>
       </View>
-
-      {todayInfo.todayLists.length > 0 ? (
+      {todayInfo && todayInfo.todayLists.length > 0 ? (
         <>
-          {/* Horizontal scrollable chips */}
           <View style={styles.chipsWrapper}>
             <ScrollView
               ref={chipsScrollViewRef}
@@ -291,19 +249,13 @@ const TodayScreen = () => {
               ))}
             </ScrollView>
           </View>
-
-          {/* Item Screen */}
           <View style={styles.itemContainer}>
             {displayedItem ? (
-              <ItemScreen 
-                item={displayedItem}
-              />
+              <ItemScreen item={displayedItem} canEdit={false} />
             ) : (
               <View style={styles.emptyState}>
                 <Text style={[styles.emptyTitle, { color: colors.textTertiary }]}>No Item Selected</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
-                  This list doesn't have a current item
-                </Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>This list doesn't have a current item</Text>
               </View>
             )}
           </View>
@@ -311,9 +263,7 @@ const TodayScreen = () => {
       ) : (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyTitle, { color: colors.textTertiary }]}>No Today Lists</Text>
-          <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
-            Mark lists as "Today" in your list settings to see them here
-          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>Mark lists as "Today" in your list settings to see them here</Text>
         </View>
       )}
     </SafeAreaView>

@@ -93,7 +93,7 @@ const fieldNameMap: { [key: string]: { [key: string]: string } } = {
 };
 
 
-// Module-level sync lock
+// Module-level d lock
 let isSyncing = false;
 
 export async function syncUserData() {
@@ -225,7 +225,7 @@ export async function syncUserData() {
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
               let value = record[supabaseField];
               // Convert date fields to Date objects
-              if (["created_at", "updated_at", "notify_time"].includes(watermelonField)) {
+              if (["created_at", "updated_at", "notify_time", "date_last_rotated_today_lists"].includes(watermelonField)) {
                 value = value ? new Date(value) : null;
               }
               transformedRecord[watermelonField] = value;

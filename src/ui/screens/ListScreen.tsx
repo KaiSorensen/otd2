@@ -29,6 +29,7 @@ import UserScreen from './UserScreen';
 import ListSettingsModal from '../components/ListSettingsModal';
 import { v4 as uuidv4 } from 'uuid';
 import ParserView from '../components/Parser';
+import { useRoute, useNavigation } from '@react-navigation/native';
 
 
 // Helper function to strip HTML tags for plain text display
@@ -213,8 +214,6 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSortDropdownOpen, setSortDropdownOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [showingUserScreen, setShowingUserScreen] = useState(false);
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isAddToLibraryModalVisible, setIsAddToLibraryModalVisible] = useState(false);
@@ -222,6 +221,9 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [listOwner, setListOwner] = useState<User | null>(null);
   const [isParserModalVisible, setIsParserModalVisible] = useState(false);
+  const route = useRoute();
+  const navigation = useNavigation();
+  const [hasHandledNotification, setHasHandledNotification] = useState(false);
 
   
   // Add useEffect to check if list is in library and use that version if it exists
@@ -264,13 +266,29 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     }
   }, [isAddToLibraryModalVisible, currentUser]);
 
-  // Select initial item if initialItemId is provided
+  // Handle navigation from notification
   useEffect(() => {
-    if (initialItemId && items.length > 0) {
-      const found = items.find(i => i.id === initialItemId);
-      if (found) setSelectedItem(found);
+    // @ts-ignore
+    const { fromNotification, itemId } = route.params || {};
+    if (
+      fromNotification &&
+      itemId &&
+      items.length > 0 &&
+      !hasHandledNotification
+    ) {
+      const found = items.find(i => i.id === itemId);
+      if (found) {
+        (navigation as any).navigate('Item', { item: found, canEdit: false });
+        (navigation as any).setParams({ fromNotification: undefined, listId: undefined, itemId: undefined });
+      }
+      setHasHandledNotification(true);
     }
-  }, [initialItemId, items]);
+  }, [route, items, navigation, hasHandledNotification]);
+
+  // When the list changes (e.g. navigating to a new list), reset the notification flag
+  useEffect(() => {
+    setHasHandledNotification(false);
+  }, [initialList.id]);
 
   // Function to fetch items
   const fetchItems = async () => {
@@ -369,7 +387,6 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
             try {
               await storeNewItem(newItem);
               setItems([...items, newItem]);
-              setSelectedItem(newItem);
             } catch (error) {
               console.error('Error creating new item:', error);
               Alert.alert('Error', 'Failed to create new item. Please try again.');
@@ -498,7 +515,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
         backgroundColor: colors.card,
         shadowColor: colors.shadow
       }]}
-      onPress={() => !isEditMode && setSelectedItem(item)}
+      onPress={() => !isEditMode && (navigation as any).navigate('Item', { item, canEdit: !!(currentUser && currentUser.id === list.ownerID) })}
     >
       <View style={styles.resultContent}>
         <Text style={[styles.resultDescription, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -521,27 +538,6 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   // Calculate header height based on screen dimensions
   const { width, height } = Dimensions.get('window');
   const headerHeight = Math.min(height * 0.4, 300);
-
-  // If showing user screen
-  if (showingUserScreen) {
-    return <UserScreen userID={list.ownerID} onBack={() => setShowingUserScreen(false)} />;
-  }
-
-  // If an item is selected, show the ItemScreen
-  if (selectedItem) {
-    return (
-      <ItemScreen 
-        item={selectedItem} 
-        onBack={() => {
-          setSelectedItem(null);
-          // Refresh items list when returning from ItemScreen
-          fetchItems();
-          //force UI update
-        }}
-        canEdit={!!(currentUser && currentUser.id === list.ownerID)}
-      />
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -615,7 +611,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
             {listOwner && (
               <TouchableOpacity 
                 style={[styles.ownerContainer, { backgroundColor: colors.backgroundSecondary }]} 
-                onPress={() => setShowingUserScreen(true)}
+                onPress={() => (navigation as any).navigate('User', { userID: listOwner.id })}
               >
                 <View style={[styles.ownerAvatarContainer, { backgroundColor: colors.backgroundTertiary }]}>
                   {listOwner.avatarURL ? (

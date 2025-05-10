@@ -102,6 +102,8 @@ export class User {
         this._email = data.email;
         this._avatarURL = data.avatarURL;
         this._notifsEnabled = data.notifsEnabled;
+        this._dateLastRotatedTodayLists = data.dateLastRotatedTodayLists;
+        this._selectedTodayListIndex = data.selectedTodayListIndex;
 
         // Refresh library data
         this._rootFolders = data.rootFolders;
