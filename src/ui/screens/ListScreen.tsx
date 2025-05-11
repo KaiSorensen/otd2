@@ -225,6 +225,11 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const navigation = useNavigation();
   const [hasHandledNotification, setHasHandledNotification] = useState(false);
 
+  // Add state for editing item modal
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [showItemScreen, setShowItemScreen] = useState(false);
+  const [pendingUpdatedItem, setPendingUpdatedItem] = useState<Item | null>(null);
+
   
   // Add useEffect to check if list is in library and use that version if it exists
   useEffect(() => {
@@ -504,6 +509,35 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     );
   };
 
+  // Function to handle opening an item for editing
+  const handleEditItem = (item: Item) => {
+    setEditingItem(item);
+    setShowItemScreen(true);
+    setPendingUpdatedItem(null);
+  };
+
+  // Function to handle saving an item from ItemScreen
+  const handleItemSave = (updatedItem: Item) => {
+    setItems(prevItems =>
+      prevItems.map(i => (i.id === updatedItem.id ? updatedItem : i))
+    );
+    setShowItemScreen(false);
+    setEditingItem(null);
+    setPendingUpdatedItem(null);
+  };
+
+  // Function to handle closing ItemScreen (back arrow)
+  const handleItemScreenBack = () => {
+    if (pendingUpdatedItem) {
+      setItems(prevItems =>
+        prevItems.map(i => (i.id === pendingUpdatedItem.id ? pendingUpdatedItem : i))
+      );
+    }
+    setShowItemScreen(false);
+    setEditingItem(null);
+    setPendingUpdatedItem(null);
+  };
+
   // Render an item row
   const renderItem = ({ item }: { item: Item }) => (
     <TouchableOpacity 
@@ -511,7 +545,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
         backgroundColor: colors.card,
         shadowColor: colors.shadow
       }]}
-      onPress={() => !isEditMode && (navigation as any).navigate('Item', { item, canEdit: !!(currentUser && currentUser.id === list.ownerID) })}
+      onPress={() => !isEditMode && handleEditItem(item)}
     >
       <View style={styles.resultContent}>
         <Text style={[styles.resultDescription, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -680,6 +714,29 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
           list={list}
         />
       )}
+
+      {/* Render ItemScreen as a modal or conditionally */}
+      <Modal
+        visible={showItemScreen}
+        animationType="slide"
+        onRequestClose={handleItemScreenBack}
+        presentationStyle="fullScreen"
+      >
+        {editingItem && (
+          <ItemScreen
+            item={editingItem}
+            canEdit={true}
+            onBack={handleItemScreenBack}
+            onSave={item => {
+              setPendingUpdatedItem(item);
+              // Update items array but don't close the modal
+              setItems(prevItems =>
+                prevItems.map(i => (i.id === item.id ? item : i))
+              );
+            }}
+          />
+        )}
+      </Modal>
     </SafeAreaView>
   );
 };

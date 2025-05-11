@@ -54,26 +54,29 @@ const MainNavigator = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Tabs" component={Tabs} />
       <Stack.Screen 
-        name="List" 
-        component={({ route, navigation }: { route: any; navigation: any }) => {
+        name="List"
+      >
+        {({ route, navigation }) => {
           const { list, initialItemId } = route.params || {};
           return <ListScreen list={list} initialItemId={initialItemId} onBack={() => navigation.goBack()} />;
-        }} 
-      />
+        }}
+      </Stack.Screen>
       <Stack.Screen 
-        name="Item" 
-        component={({ route, navigation }: { route: any; navigation: any }) => {
-          const { item, canEdit } = route.params || {};
-          return <ItemScreen item={item} canEdit={canEdit} onBack={() => navigation.goBack()} />;
-        }} 
-      />
+        name="Item"
+      >
+        {({ route, navigation }) => {
+          const { item, canEdit, onSave } = route.params || {};
+          return <ItemScreen item={item} canEdit={canEdit} onBack={() => navigation.goBack()} onSave={onSave} />;
+        }}
+      </Stack.Screen>
       <Stack.Screen 
-        name="User" 
-        component={({ route, navigation }: { route: any; navigation: any }) => {
+        name="User"
+      >
+        {({ route, navigation }) => {
           const { userID } = route.params || {};
           return <UserScreen userID={userID} onBack={() => navigation.goBack()} />;
-        }} 
-      />
+        }}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 };

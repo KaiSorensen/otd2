@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -13,54 +13,104 @@ import { RichText, Toolbar, useEditorBridge } from '@10play/tentap-editor';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Item } from '../../classes/Item';
-import { updateItem } from '../../wdb/wdbService';
+import { updateItem, storeNewItem } from '../../wdb/wdbService';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ItemScreenProps {
-  item: Item | null;
+  item?: Item | null; // null or undefined means create mode
   canEdit: boolean;
   onBack?: () => void;
+  onSave?: (item: Item) => void;
+  listId?: string; // required for create mode
 }
 
 const ItemScreen: React.FC<ItemScreenProps> = (props) => {
-  const { item, canEdit, onBack } = props;
+  const { item, canEdit, onBack, onSave, listId } = props;
   const navigation = useNavigation();
-
+  const isCreate = !item;
+  const initialContent = item?.content || '';
+  const [dirty, setDirty] = useState(false);
+  const [currentContent, setCurrentContent] = useState(initialContent);
+  const [saving, setSaving] = useState(false);
   const editor = useEditorBridge({
-    autofocus: !canEdit,
+    autofocus: true,
     avoidIosKeyboard: true,
-    initialContent: item?.content || '<p>Start typing your notes here...</p>',
+    initialContent: initialContent || '<p>Start typing your notes here...</p>',
   });
 
+  // Track dirty state
   useEffect(() => {
-    const newContent = item?.content || '<p>Start typing your notes here...</p>';
-    const updateContentIfNeeded = async () => {
-      if (editor) {
-        const currentEditorHTML = await editor.getHTML();
-        if (currentEditorHTML !== newContent) {
-          editor.setContent(newContent);
+    setCurrentContent(initialContent);
+    setDirty(false);
+  }, [item?.id, initialContent]);
+
+  // Listen for content changes (polling workaround for tentap editor)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    let lastContent = initialContent;
+    if (editor) {
+      interval = setInterval(async () => {
+        const html = await editor.getHTML();
+        if (html !== lastContent) {
+          setCurrentContent(html);
+          setDirty(html !== initialContent && html !== '<p>Start typing your notes here...</p>');
+          lastContent = html;
         }
-      }
+      }, 300);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
     };
-    updateContentIfNeeded();
-  }, [item?.id, item?.content, editor]);
+  }, [editor, initialContent]);
 
   const handleSave = async () => {
-    if (!item || !canEdit) {
-      Alert.alert('Error', 'Cannot save item. No item loaded or not in edit mode.');
-      return;
-    }
+    if (!canEdit) return;
+    setSaving(true);
     try {
       const htmlContent = await editor.getHTML();
-      await updateItem(item.id, { content: htmlContent });
-      Alert.alert('Success', 'Item saved!');
-      if (onBack) {
-        onBack();
-      } else if (navigation.canGoBack()) {
-        navigation.goBack();
+      let savedItem: Item;
+      if (isCreate) {
+        if (!listId) {
+          Alert.alert('Error', 'No list ID provided for new item.');
+          setSaving(false);
+          return;
+        }
+        if (!htmlContent || htmlContent === '<p>Start typing your notes here...</p>' || htmlContent === '<p></p>') {
+          Alert.alert('Cannot save empty item.');
+          setSaving(false);
+          return;
+        }
+        savedItem = new Item(
+          uuidv4(),
+          listId,
+          htmlContent,
+          [],
+          0,
+          new Date(),
+          new Date()
+        );
+        await storeNewItem(savedItem);
+      } else if (item) {
+        savedItem = new Item(
+          item.id,
+          item.listID,
+          htmlContent,
+          item.imageURLs,
+          item.orderIndex,
+          item.createdAt,
+          new Date()
+        );
+        await updateItem(item.id, { content: htmlContent });
+      } else {
+        setSaving(false);
+        return;
       }
+      setDirty(false);
+      if (onSave) onSave(savedItem);
     } catch (error) {
-      console.error('Error saving item:', error);
       Alert.alert('Error', 'Failed to save item.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -91,7 +141,7 @@ const ItemScreen: React.FC<ItemScreenProps> = (props) => {
           <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>Share</Text>
           </TouchableOpacity>
-          {item && canEdit && (
+          {canEdit && dirty && !saving && (
             <TouchableOpacity onPress={handleSave} style={[styles.headerButton, styles.saveButton]}>
               <Text style={styles.headerButtonText}>Save</Text>
             </TouchableOpacity>
