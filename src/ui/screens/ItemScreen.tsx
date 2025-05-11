@@ -1,150 +1,115 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
+  SafeAreaView,
   View,
   Text,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
   TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  ActivityIndicator,
   Alert,
-  TextInput,
-  BackHandler,
-  ScrollView,
 } from 'react-native';
+import { RichText, Toolbar, useEditorBridge } from '@10play/tentap-editor';
+import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Item } from '../../classes/Item';
-import { useColors } from '../../contexts/ColorContext';
+import { updateItem } from '../../wdb/wdbService';
 
 interface ItemScreenProps {
-  item: Item;
+  item: Item | null;
+  canEdit: boolean;
   onBack?: () => void;
-  canEdit?: boolean;
 }
 
-// Helper function to strip HTML tags for plain text display
-const stripHtml = (html: string): string => {
-  return html.replace(/<[^>]*>?/gm, '');
-};
+const ItemScreen: React.FC<ItemScreenProps> = (props) => {
+  const { item, canEdit, onBack } = props;
+  const navigation = useNavigation();
 
-const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false }) => {
-  const { colors, isDarkMode } = useColors();
-  const [content, setContent] = useState<string>(stripHtml(item.content || ''));
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const editor = useEditorBridge({
+    autofocus: !canEdit,
+    avoidIosKeyboard: true,
+    initialContent: item?.content || '<p>Start typing your notes here...</p>',
+  });
 
-  // Log item content for debugging
   useEffect(() => {
-    // // console.log('Content length:', item.content?.length || 0);
-    // // console.log('Content preview:', item.content?.substring(0, 100));
-  }, []);
-
-  // Update state when item prop changes
-  useEffect(() => {
-    setContent(stripHtml(item.content || ''));
-    setHasChanges(false);
-  }, [item]);
-
-  // Handle back button press
-  useEffect(() => {
-    const backAction = () => {
-      handleBack();
-      return true;
+    const newContent = item?.content || '<p>Start typing your notes here...</p>';
+    const updateContentIfNeeded = async () => {
+      if (editor) {
+        const currentEditorHTML = await editor.getHTML();
+        if (currentEditorHTML !== newContent) {
+          editor.setContent(newContent);
+        }
+      }
     };
+    updateContentIfNeeded();
+  }, [item?.id, item?.content, editor]);
 
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction
-    );
-
-    return () => backHandler.remove();
-  }, [hasChanges]);
-
-  // Save changes to the item
-  const saveChanges = async () => {
-    if (!hasChanges) return;
-    
-    setIsSaving(true);
+  const handleSave = async () => {
+    if (!item || !canEdit) {
+      Alert.alert('Error', 'Cannot save item. No item loaded or not in edit mode.');
+      return;
+    }
     try {
-      // Format content as simple HTML
-      const htmlContent = `<p>${content.replace(/\n/g, '</p><p>')}</p>`;
-      item.content = htmlContent;
-      // Save to database
-      await item.save();
-      setHasChanges(false);
+      const htmlContent = await editor.getHTML();
+      await updateItem(item.id, { content: htmlContent });
+      Alert.alert('Success', 'Item saved!');
+      if (onBack) {
+        onBack();
+      } else if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     } catch (error) {
       console.error('Error saving item:', error);
-      Alert.alert('Error', 'Failed to save changes. Please try again.');
-    } finally {
-      setIsSaving(false);
+      Alert.alert('Error', 'Failed to save item.');
     }
   };
 
-  // Handle back button press
-  const handleBack = async () => {
-    if (hasChanges) {
-      // Save changes before going back
-      await saveChanges();
-    }
-    
-    if (onBack) {
-      onBack();
-    }
+  const handleAdd = () => {
+    Alert.alert('Add', 'Add functionality to be implemented.');
   };
 
-  // Handle content change
-  const handleContentChange = (text: string) => {
-    setContent(text);
-    setHasChanges(true);
+  const handleShare = () => {
+    Alert.alert('Share', 'Share functionality to be implemented.');
   };
+
+  const effectiveOnBack = onBack || (navigation.canGoBack() ? navigation.goBack : undefined);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-      
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.divider }]}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color={colors.iconPrimary} />
-        </TouchableOpacity>
-        
-        <View style={styles.headerRight}>
-          {isSaving ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            hasChanges && canEdit && (
-              <TouchableOpacity 
-                onPress={saveChanges} 
-                style={[styles.saveButton, { backgroundColor: colors.primary }]}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            )
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerLeftContainer}>
+          {effectiveOnBack && (
+            <TouchableOpacity onPress={effectiveOnBack} style={styles.headerButton}>
+              <Icon name="arrow-back" size={24} color={styles.headerButtonText.color} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity onPress={handleAdd} style={styles.headerButton}>
+            <Text style={styles.headerButtonText}>Add</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
+            <Text style={styles.headerButtonText}>Share</Text>
+          </TouchableOpacity>
+          {item && canEdit && (
+            <TouchableOpacity onPress={handleSave} style={[styles.headerButton, styles.saveButton]}>
+              <Text style={styles.headerButtonText}>Save</Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
-      
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
-        {/* Content Input */}
-        <TextInput
-          style={[
-            styles.contentInput, 
-            { 
-              color: colors.textPrimary,
-              opacity: canEdit ? 1 : 0.7
-            }
-          ]}
-          value={content}
-          onChangeText={handleContentChange}
-          placeholder="Start typing..."
-          placeholderTextColor={colors.inputPlaceholder}
-          multiline={true}
-          textAlignVertical="top"
-          autoCapitalize="sentences"
-          autoCorrect={true}
-          editable={canEdit}
-        />
-      </ScrollView>
+
+      <View style={styles.editorContainer}>
+        <RichText editor={editor} style={styles.richTextEditor} />
+      </View>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={0}
+      >
+        <Toolbar editor={editor} />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -152,45 +117,51 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f8f8f8',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'ios' ? 10 : 20,
+    paddingBottom: 10,
     borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#ffffff',
   },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerRight: {
+  headerLeftContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  headerButton: {
+    padding: 8,
+  },
   saveButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
+    marginLeft: 10,
   },
-  saveButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  contentInput: {
-    flex: 1,
+  headerButtonText: {
     fontSize: 16,
-    lineHeight: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 300,
+    color: '#007AFF',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editorContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 15,
+    paddingBottom: 15,
+  },
+  richTextEditor: {
+    flex: 1,
+  },
+  keyboardAvoidingView: {
+    position: 'absolute',
+    width: '100%',
+    bottom: 0,
   },
 });
 
-export default ItemScreen; 
+export default ItemScreen;
