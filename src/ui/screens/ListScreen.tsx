@@ -375,18 +375,24 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               list.id,
               '',
               [],
-              0,
+              items.length, // order index
               new Date(),
               new Date()
             );
 
-            try {
-              await storeNewItem(newItem);
-              setItems([...items, newItem]);
-            } catch (error) {
-              console.error('Error creating new item:', error);
-              Alert.alert('Error', 'Failed to create new item. Please try again.');
-            }
+            // Navigate to ItemScreen for editing, only save if user actually saves
+            (navigation as any).navigate('Item', {
+              item: newItem,
+              canEdit: true,
+              onItemUpdate: (updatedItem: Item) => {
+                if (updatedItem.content && !items.some(i => i.id === updatedItem.id)) {
+                  setItems([...items, updatedItem]);
+                }
+              },
+              onBack: () => {
+                // No-op: do not save or add blank item if user cancels/back
+              }
+            });
           }
         },
         {

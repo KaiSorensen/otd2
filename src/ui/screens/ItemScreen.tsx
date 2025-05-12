@@ -17,6 +17,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { WebView } from 'react-native-webview';
 import { Item } from '../../classes/Item';
 import { useColors } from '../../contexts/ColorContext';
+import { storeNewItem } from '../../wdb/wdbService';
+import { retrieveItem } from '../../wdb/wdbService';
 
 interface ItemScreenProps {
   item: Item;
@@ -79,7 +81,12 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false, 
     setIsSaving(true);
     try {
       item.content = content;
-      await item.save();
+      try {
+        await storeNewItem(item);
+      } catch (e: any) {
+        // If already exists, update instead
+        await item.save();
+      }
       setHasChanges(false);
       if (onItemUpdate) onItemUpdate(item);
     } catch (error) {
