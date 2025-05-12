@@ -57,8 +57,8 @@ const ListScreenWrapper = ({ route, navigation }: { route: any; navigation: any 
 
 // Item Screen Component
 const ItemScreenWrapper = ({ route, navigation }: { route: any; navigation: any }) => {
-  const { item, canEdit, onItemUpdate } = route.params || {};
-  return <ItemScreen item={item} canEdit={canEdit} onBack={() => navigation.goBack()} onItemUpdate={onItemUpdate} />;
+  const { item, canEdit, onItemDone } = route.params || {};
+  return <ItemScreen item={item} canEdit={canEdit} onBack={() => navigation.goBack()} onItemDone={onItemDone} />;
 };
 
 // User Screen Component

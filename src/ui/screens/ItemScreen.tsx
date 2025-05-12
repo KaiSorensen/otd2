@@ -19,15 +19,18 @@ import { Item } from '../../classes/Item';
 import { useColors } from '../../contexts/ColorContext';
 import { storeNewItem } from '../../wdb/wdbService';
 import { retrieveItem } from '../../wdb/wdbService';
+import { deleteItem } from '../../wdb/wdbService';
 
 interface ItemScreenProps {
   item: Item;
+  isNew?: boolean;
+  onItemDone?: (result: { item: Item, deleted: boolean }) => void;
   onBack?: () => void;
   canEdit?: boolean;
   onItemUpdate?: (item: Item) => void;
 }
 
-const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false, onItemUpdate }) => {
+const ItemScreen: React.FC<ItemScreenProps> = ({ item, isNew = false, onItemDone, onBack, canEdit = false, onItemUpdate }) => {
   const { colors, isDarkMode } = useColors();
   const [content, setContent] = useState<string>(item.content || '');
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -75,34 +78,44 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false, 
     setHasChanges(true);
   };
 
+  // Handle back navigation
+  const handleBack = async () => {
+    const trimmed = content.trim();
+    if (trimmed.length === 0) {
+      // Delete the item if blank
+      await deleteItem(item.listID, item.id);
+      if (onItemDone) onItemDone({ item, deleted: true });
+    } else {
+      item.content = content;
+      await item.save();
+      if (onItemDone) onItemDone({ item, deleted: false });
+    }
+    onBack && onBack();
+  };
+
   // Save changes to the item
   const saveChanges = async () => {
     if (!hasChanges) return;
     setIsSaving(true);
     try {
-      item.content = content;
-      try {
-        await storeNewItem(item);
-      } catch (e: any) {
-        // If already exists, update instead
+      const trimmed = content.trim();
+      if (trimmed.length === 0) {
+        // Delete the item if blank
+        await deleteItem(item.listID, item.id);
+        if (onItemDone) onItemDone({ item, deleted: true });
+      } else {
+        item.content = content;
         await item.save();
+        setHasChanges(false);
+        if (onItemDone) onItemDone({ item, deleted: false });
       }
-      setHasChanges(false);
-      if (onItemUpdate) onItemUpdate(item);
+      // Do NOT close the screen here
     } catch (error) {
       console.error('Error saving item:', error);
       Alert.alert('Error', 'Failed to save changes. Please try again.');
     } finally {
       setIsSaving(false);
     }
-  };
-
-  // Handle back navigation
-  const handleBack = async () => {
-    if (hasChanges) {
-      await saveChanges();
-    }
-    onBack && onBack();
   };
 
   // Initial HTML for the WebView editor

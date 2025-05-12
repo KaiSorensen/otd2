@@ -363,48 +363,28 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const handleAddItem = async () => {
     if (!currentUser || currentUser.id !== list.ownerID) return;
 
-    Alert.alert(
-      'Add Item',
-      'How would you like to add items?',
-      [
-        {
-          text: 'Single Item',
-          onPress: async () => {
-            const newItem = new Item(
-              uuidv4(),
-              list.id,
-              '',
-              [],
-              items.length, // order index
-              new Date(),
-              new Date()
-            );
-
-            // Navigate to ItemScreen for editing, only save if user actually saves
-            (navigation as any).navigate('Item', {
-              item: newItem,
-              canEdit: true,
-              onItemUpdate: (updatedItem: Item) => {
-                if (updatedItem.content && !items.some(i => i.id === updatedItem.id)) {
-                  setItems([...items, updatedItem]);
-                }
-              },
-              onBack: () => {
-                // No-op: do not save or add blank item if user cancels/back
-              }
-            });
-          }
-        },
-        {
-          text: 'Use Parser',
-          onPress: () => setIsParserModalVisible(true)
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        }
-      ]
+    const newItem = new Item(
+      uuidv4(),
+      list.id,
+      '',
+      [],
+      items.length,
+      new Date(),
+      new Date()
     );
+    await storeNewItem(newItem);
+    setItems([...items, newItem]);
+    (navigation as any).navigate('Item', {
+      item: newItem,
+      canEdit: true,
+      onItemDone: (result: { item: Item, deleted: boolean }) => {
+        if (result.deleted) {
+          setItems((prev) => prev.filter(i => i.id !== newItem.id));
+        } else {
+          setItems((prev) => prev.map(i => i.id === newItem.id ? result.item : i));
+        }
+      }
+    });
   };
 
   // Function to handle deleting an item
@@ -522,9 +502,13 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
           (navigation as any).navigate('Item', {
             item,
             canEdit: !!(currentUser && currentUser.id === list.ownerID),
-            onItemUpdate: (updatedItem: Item) => {
-              setItems((prevItems) => prevItems.map((i) => i.id === updatedItem.id ? updatedItem : i));
-            },
+            onItemDone: (result: { item: Item, deleted: boolean }) => {
+              if (result.deleted) {
+                setItems((prev) => prev.filter(i => i.id !== item.id));
+              } else {
+                setItems((prev) => prev.map(i => i.id === item.id ? result.item : i));
+              }
+            }
           });
         }
       }}
