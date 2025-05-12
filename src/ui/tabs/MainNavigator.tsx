@@ -49,31 +49,31 @@ function Tabs() {
   );
 }
 
+// List Screen Component
+const ListScreenWrapper = ({ route, navigation }: { route: any; navigation: any }) => {
+  const { list, initialItemId } = route.params || {};
+  return <ListScreen list={list} initialItemId={initialItemId} onBack={() => navigation.goBack()} />;
+};
+
+// Item Screen Component
+const ItemScreenWrapper = ({ route, navigation }: { route: any; navigation: any }) => {
+  const { item, canEdit } = route.params || {};
+  return <ItemScreen item={item} canEdit={canEdit} onBack={() => navigation.goBack()} />;
+};
+
+// User Screen Component
+const UserScreenWrapper = ({ route, navigation }: { route: any; navigation: any }) => {
+  const { userID } = route.params || {};
+  return <UserScreen userID={userID} onBack={() => navigation.goBack()} />;
+};
+
 const MainNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Tabs" component={Tabs} />
-      <Stack.Screen 
-        name="List" 
-        component={({ route, navigation }: { route: any; navigation: any }) => {
-          const { list, initialItemId } = route.params || {};
-          return <ListScreen list={list} initialItemId={initialItemId} onBack={() => navigation.goBack()} />;
-        }} 
-      />
-      <Stack.Screen 
-        name="Item" 
-        component={({ route, navigation }: { route: any; navigation: any }) => {
-          const { item, canEdit } = route.params || {};
-          return <ItemScreen item={item} canEdit={canEdit} onBack={() => navigation.goBack()} />;
-        }} 
-      />
-      <Stack.Screen 
-        name="User" 
-        component={({ route, navigation }: { route: any; navigation: any }) => {
-          const { userID } = route.params || {};
-          return <UserScreen userID={userID} onBack={() => navigation.goBack()} />;
-        }} 
-      />
+      <Stack.Screen name="List" component={ListScreenWrapper} />
+      <Stack.Screen name="Item" component={ItemScreenWrapper} />
+      <Stack.Screen name="User" component={UserScreenWrapper} />
     </Stack.Navigator>
   );
 };
