@@ -22,10 +22,11 @@ interface ItemScreenProps {
   onBack?: () => void;
   onSave?: (item: Item) => void;
   listId?: string; // required for create mode
+  hideBackButton?: boolean; // new prop to hide back button when in TodayTab
 }
 
 const ItemScreen: React.FC<ItemScreenProps> = (props) => {
-  const { item, canEdit, onBack, onSave, listId } = props;
+  const { item, canEdit, onBack, onSave, listId, hideBackButton = false } = props;
   const navigation = useNavigation();
   const isCreate = !item;
   const initialContent = item?.content || '';
@@ -33,7 +34,7 @@ const ItemScreen: React.FC<ItemScreenProps> = (props) => {
   const [currentContent, setCurrentContent] = useState(initialContent);
   const [saving, setSaving] = useState(false);
   const editor = useEditorBridge({
-    autofocus: true,
+    autofocus: isCreate, // Only autofocus for new items
     avoidIosKeyboard: true,
     initialContent: initialContent || '<p>Start typing your notes here...</p>',
   });
@@ -44,19 +45,37 @@ const ItemScreen: React.FC<ItemScreenProps> = (props) => {
     setDirty(false);
   }, [item?.id, initialContent]);
 
+  // Set initial content immediately when editor is available
+  useEffect(() => {
+    if (editor && initialContent) {
+      editor.setContent(initialContent);
+    }
+  }, [editor]);
+
   // Listen for content changes (polling workaround for tentap editor)
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     let lastContent = initialContent;
     if (editor) {
-      interval = setInterval(async () => {
-        const html = await editor.getHTML();
-        if (html !== lastContent) {
-          setCurrentContent(html);
-          setDirty(html !== initialContent && html !== '<p>Start typing your notes here...</p>');
-          lastContent = html;
+      // Check content immediately
+      const checkContent = async () => {
+        try {
+          const html = await editor.getHTML();
+          if (html !== lastContent) {
+            setCurrentContent(html);
+            setDirty(html !== initialContent && html !== '<p>Start typing your notes here...</p>');
+            lastContent = html;
+          }
+        } catch (error) {
+          console.error('Error getting editor content:', error);
         }
-      }, 300);
+      };
+      
+      // Check once right away
+      checkContent();
+      
+      // Set up polling at a faster rate (200ms instead of 300ms)
+      interval = setInterval(checkContent, 200);
     }
     return () => {
       if (interval) clearInterval(interval);
@@ -128,7 +147,7 @@ const ItemScreen: React.FC<ItemScreenProps> = (props) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeftContainer}>
-          {effectiveOnBack && (
+          {!hideBackButton && effectiveOnBack && (
             <TouchableOpacity onPress={effectiveOnBack} style={styles.headerButton}>
               <Icon name="arrow-back" size={24} color={styles.headerButtonText.color} />
             </TouchableOpacity>
