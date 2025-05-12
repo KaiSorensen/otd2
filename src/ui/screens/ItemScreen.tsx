@@ -142,12 +142,12 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false, 
       </KeyboardAvoidingView>
       {canEdit && (
         <View style={[styles.toolbar, { borderTopColor: colors.divider, backgroundColor: colors.background }]}>  
-          <TouchableOpacity onPress={() => applyFormat('bold')}><Icon name="md-bold" size={24} color={colors.iconPrimary} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => applyFormat('italic')}><Icon name="md-italic" size={24} color={colors.iconPrimary} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => applyFormat('underline')}><Icon name="md-underline" size={24} color={colors.iconPrimary} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => applyFormat('insertUnorderedList')}><Icon name="md-list" size={24} color={colors.iconPrimary} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => applyFormat('insertHTML', '<input type=\"checkbox\" /> ')}><Icon name="checkbox-outline" size={24} color={colors.iconPrimary} /></TouchableOpacity>
-          <TouchableOpacity onPress={() => applyFormat('formatBlock', 'H1')}><Icon name="md-heading" size={24} color={colors.iconPrimary} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFormat('bold')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>B</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFormat('italic')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>I</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFormat('underline')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>U</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFormat('insertUnorderedList')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>•</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFormat('insertHTML', '<input type=\"checkbox\" /> ')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>☑</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => applyFormat('formatBlock', 'H1')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>H1</Text></TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
@@ -164,6 +164,8 @@ const styles = StyleSheet.create({
   editorContainer: { flex: 1 },
   webview: { flex: 1, backgroundColor: 'transparent' },
   toolbar: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 8, borderTopWidth: 1 },
+  toolbarButton: { width: 36, height: 36, backgroundColor: '#eee', borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginHorizontal: 4 },
+  toolbarButtonText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
 });
 
 export default ItemScreen;
