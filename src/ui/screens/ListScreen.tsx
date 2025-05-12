@@ -511,7 +511,17 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
         backgroundColor: colors.card,
         shadowColor: colors.shadow
       }]}
-      onPress={() => !isEditMode && (navigation as any).navigate('Item', { item, canEdit: !!(currentUser && currentUser.id === list.ownerID) })}
+      onPress={() => {
+        if (!isEditMode) {
+          (navigation as any).navigate('Item', {
+            item,
+            canEdit: !!(currentUser && currentUser.id === list.ownerID),
+            onItemUpdate: (updatedItem: Item) => {
+              setItems((prevItems) => prevItems.map((i) => i.id === updatedItem.id ? updatedItem : i));
+            },
+          });
+        }
+      }}
     >
       <View style={styles.resultContent}>
         <Text style={[styles.resultDescription, { color: colors.textSecondary }]} numberOfLines={2}>
