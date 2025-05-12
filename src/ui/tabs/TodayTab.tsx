@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -18,7 +18,7 @@ import { useColors } from '../../contexts/ColorContext';
 import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 
 const TodayScreen = () => {
   const { currentUser, loading, forceUserUpdate } = useAuth();
@@ -26,48 +26,50 @@ const TodayScreen = () => {
   const [todayInfo, setTodayInfo] = useState<TodayInfo | null>(null);
   const [selectedListIndex, setSelectedListIndex] = useState<number>(0);
   const [loadingLists, setLoadingLists] = useState<boolean>(true);
+  const [initialLoaded, setInitialLoaded] = useState<boolean>(false);
   const chipsScrollViewRef = useRef<ScrollView>(null);
   const { width } = Dimensions.get('window');
   const route = useRoute();
   const navigation = useNavigation();
   const [displayedItem, setDisplayedItem] = useState<Item | null>(null);
 
+  // Define fetchTodayInfo for initial load and refresh
+  const fetchTodayInfo = useCallback(async () => {
+    if (!currentUser) {
+      setTodayInfo(null);
+      setLoadingLists(false);
+      setInitialLoaded(true);
+      return;
+    }
+    setLoadingLists(true);
+    try {
+      const lists = currentUser.getTodayLists();
+      const info = new TodayInfo(lists);
+      await info.refreshTodayItems();
+      setTodayInfo(info);
+      let idx = 0;
+      if (
+        typeof currentUser.selectedTodayListIndex === 'number' &&
+        currentUser.selectedTodayListIndex >= 0 &&
+        currentUser.selectedTodayListIndex < lists.length
+      ) {
+        idx = currentUser.selectedTodayListIndex;
+      }
+      setSelectedListIndex(idx);
+    } catch (error) {
+      console.error('Error fetching today info:', error);
+    } finally {
+      setLoadingLists(false);
+      setInitialLoaded(true);
+    }
+  }, [currentUser]);
+
   // Fetch today info on component mount or when user changes
   useEffect(() => {
-    const fetchTodayInfo = async () => {
-      if (!currentUser) {
-        setTodayInfo(null);
-        setLoadingLists(false);
-        return;
-      }
-
-      setLoadingLists(true);
-      try {
-        const lists = currentUser.getTodayLists();
-        const info = new TodayInfo(lists);
-        await info.refreshTodayItems();
-        setTodayInfo(info);
-        // Use the selected list index from the user, but default to 0 if invalid
-        let idx = 0;
-        if (
-          typeof currentUser.selectedTodayListIndex === 'number' &&
-          currentUser.selectedTodayListIndex >= 0 &&
-          currentUser.selectedTodayListIndex < lists.length
-        ) {
-          idx = currentUser.selectedTodayListIndex;
-        }
-        setSelectedListIndex(idx);
-      } catch (error) {
-        console.error('Error fetching today info:', error);
-      } finally {
-        setLoadingLists(false);
-      }
-    };
-
     if (!loading) {
       fetchTodayInfo();
     }
-  }, [currentUser, loading, forceUserUpdate]);
+  }, [fetchTodayInfo, loading]);
 
   // Handle navigation from notification
   useEffect(() => {
@@ -94,6 +96,15 @@ const TodayScreen = () => {
       setDisplayedItem(null);
     }
   }, [todayInfo, selectedListIndex]);
+
+  // Refresh today info when this tab/screen regains focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!loading) {
+        fetchTodayInfo();
+      }
+    }, [fetchTodayInfo, loading])
+  );
 
   // Handle chip press to open ListScreen and update selected list
   const handleChipPress = async (index: number) => {
@@ -164,8 +175,8 @@ const TodayScreen = () => {
     }
   };
 
-  // Show loading state while fetching user or lists
-  if (loading || loadingLists) {
+  // Show loading state until authentication loads and initial fetch completes
+  if (loading || !initialLoaded) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
