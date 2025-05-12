@@ -11,6 +11,7 @@ import {
   BackHandler,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { WebView } from 'react-native-webview';
@@ -30,6 +31,8 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false, 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
   const webviewRef = useRef<WebView>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState<boolean>(false);
 
   // Setup back handler
   useEffect(() => {
@@ -40,6 +43,20 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false, 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
   }, [hasChanges]);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setIsKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+    });
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // Handle messages from WebView
   const handleMessage = (html: string) => {
@@ -140,8 +157,8 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, onBack, canEdit = false, 
           hideKeyboardAccessoryView={true}
         />
       </KeyboardAvoidingView>
-      {canEdit && (
-        <View style={[styles.toolbar, { borderTopColor: colors.divider, backgroundColor: colors.background }]}>  
+      {canEdit && isKeyboardVisible && (
+        <View style={[styles.toolbar, { borderTopColor: colors.divider, backgroundColor: colors.background, bottom: keyboardHeight }]}>
           <TouchableOpacity onPress={() => applyFormat('bold')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>B</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => applyFormat('italic')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>I</Text></TouchableOpacity>
           <TouchableOpacity onPress={() => applyFormat('underline')} style={styles.toolbarButton}><Text style={styles.toolbarButtonText}>U</Text></TouchableOpacity>
@@ -163,7 +180,7 @@ const styles = StyleSheet.create({
   saveButtonText: { color: '#fff', fontWeight: '500' },
   editorContainer: { flex: 1 },
   webview: { flex: 1, backgroundColor: 'transparent' },
-  toolbar: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 8, borderTopWidth: 1 },
+  toolbar: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 8, borderTopWidth: 1, position: 'absolute', left: 0, right: 0 },
   toolbarButton: { width: 36, height: 36, backgroundColor: '#eee', borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginHorizontal: 4 },
   toolbarButtonText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
 });

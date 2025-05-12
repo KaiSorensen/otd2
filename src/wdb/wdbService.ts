@@ -562,7 +562,7 @@ export async function initializeTodayItem(list: List) {
 
 export async function syncDateLastRotatedTodayLists(user: User) {
   if (!user.dateLastRotatedTodayLists) {
-    console.log('no dateLastRotatedTodayLists found, setting to now');
+    // console.log('no dateLastRotatedTodayLists found, setting to now');
     user.dateLastRotatedTodayLists = new Date();
     await updateUser(user.id, { dateLastRotatedTodayLists: user.dateLastRotatedTodayLists });
   }
@@ -581,17 +581,17 @@ export async function syncDateLastRotatedTodayLists(user: User) {
     lastUpdated.getDate()
   );
 
-  console.log("Last rotated date:", lastUpdatedDateOnly.toDateString());
-  console.log("Today's date:", todayDateOnly.toDateString());
+  // console.log("Last rotated date:", lastUpdatedDateOnly.toDateString());
+  // console.log("Today's date:", todayDateOnly.toDateString());
 
   if (todayDateOnly.getTime() !== lastUpdatedDateOnly.getTime()) {
-    console.log("Date has changed. Rotating items.");
+    // console.log("Date has changed. Rotating items.");
     rotateTodayItemsAllLists(user, 1);
     user.dateLastRotatedTodayLists = today;
     await updateUser(user.id, { dateLastRotatedTodayLists: today });
-    console.log("Updated user's dateLastRotatedTodayLists to:", today.toISOString());
+    // console.log("Updated user's dateLastRotatedTodayLists to:", today.toISOString());
   } else {
-    console.log("Date has not changed. No rotation needed.");
+    // console.log("Date has not changed. No rotation needed.");
   }
 }
 
