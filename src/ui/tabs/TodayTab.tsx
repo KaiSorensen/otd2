@@ -19,6 +19,7 @@ import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { rotateTodayItemForList, retrieveItem, getItemsInList } from '../../wdb/wdbService';
 
 const TodayScreen = () => {
   const { currentUser, loading, forceUserUpdate } = useAuth();
@@ -100,10 +101,39 @@ const TodayScreen = () => {
   // Refresh today info when this tab/screen regains focus
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
-        fetchTodayInfo();
-      }
-    }, [fetchTodayInfo, loading])
+      let isActive = true;
+      const silentRefresh = async () => {
+        if (!currentUser) return;
+        const lists = currentUser.getTodayLists();
+        const info = new TodayInfo(lists);
+        await info.refreshTodayItems();
+        // For each list, check if currentItem exists
+        for (const list of lists) {
+          if (!list.currentItem) continue;
+          const items = await getItemsInList(list);
+          const current = items.find(i => i.id === list.currentItem);
+          if (!current) {
+            // If currentItem was deleted, rotate
+            await rotateTodayItemForList(currentUser.id, list, 'next');
+            await info.refreshTodayItems();
+          }
+        }
+        if (isActive) {
+          setTodayInfo(info);
+          let idx = 0;
+          if (
+            typeof currentUser.selectedTodayListIndex === 'number' &&
+            currentUser.selectedTodayListIndex >= 0 &&
+            currentUser.selectedTodayListIndex < lists.length
+          ) {
+            idx = currentUser.selectedTodayListIndex;
+          }
+          setSelectedListIndex(idx);
+        }
+      };
+      silentRefresh();
+      return () => { isActive = false; };
+    }, [currentUser])
   );
 
   // Handle chip press to open ListScreen and update selected list
