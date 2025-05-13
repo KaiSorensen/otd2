@@ -560,6 +560,11 @@ export async function initializeTodayItem(list: List) {
   await updateLibraryList(list.ownerID, list.folderID, list.id, { currentItem: list.currentItem });
 }
 
+export async function getItemsFromListBySubstring(list: List, substring: string): Promise<Item[]> {
+  const items = await getItemsInList(list);
+  return items.filter((item) => item.content.includes(substring));
+}
+
 export async function syncDateLastRotatedTodayLists(user: User) {
   if (!user.dateLastRotatedTodayLists) {
     // console.log('no dateLastRotatedTodayLists found, setting to now');

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -18,7 +19,7 @@ import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { User } from '../../classes/User';
 import { Folder } from '../../classes/Folder';
-import { addItems, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList } from '../../wdb/wdbService';
+import { addItems, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList, getItemsFromListBySubstring } from '../../wdb/wdbService';
 import { getItemsInList as remote_getItemsInList, retrieveUser } from '../../supabase/databaseService';
 // import ListImage from '../components/ListImage';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -212,6 +213,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const { colors, isDarkMode } = useColors();
   const [list, setList] = useState<List>(initialList);
   const [items, setItems] = useState<Item[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [isSortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
@@ -285,6 +287,31 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   useEffect(() => {
     setHasHandledNotification(false);
   }, [initialList.id]);
+
+  // Handle searching items within the list
+  useEffect(() => {
+    const performSearch = async () => {
+      setLoading(true);
+      try {
+        if (searchTerm.trim().length > 0) {
+          if (list.folderID) {
+            const searchedItems = await getItemsFromListBySubstring(list, searchTerm.trim());
+            setItems(searchedItems);
+          } else {
+            const allItems = await remote_getItemsInList(list.id);
+            setItems(allItems.filter(i => i.content.includes(searchTerm)));
+          }
+        } else {
+          await fetchItems();
+        }
+      } catch (error) {
+        console.error('Error searching items:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    performSearch();
+  }, [searchTerm]);
 
   // Function to fetch items
   const fetchItems = async () => {
@@ -657,6 +684,26 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
           </View>
         </View>
         
+        {/* Search items input */}
+        <View style={[styles.searchBar, { backgroundColor: colors.inputBackground, shadowColor: colors.shadow, borderColor: colors.inputBorder, borderWidth: 1 }]}>  
+          <Icon name="search-outline" size={24} color={colors.iconSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.inputText }]}
+            placeholder="Search items..."
+            placeholderTextColor={colors.inputPlaceholder}
+            value={searchTerm}
+            onChangeText={setSearchTerm}
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchTerm.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchTerm('')} style={styles.clearButton}>
+              <Icon name="close-circle-outline" size={20} color={colors.iconSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        
         {/* Items list */}
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
@@ -961,6 +1008,31 @@ const styles = StyleSheet.create({
   },
   folderLoader: {
     marginVertical: 16,
+  },
+  // Search bar styles for item search
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    margin: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 8,
+  },
+  clearButton: {
+    padding: 4,
   },
 });
 
