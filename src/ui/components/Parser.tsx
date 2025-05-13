@@ -11,322 +11,292 @@ import {
   Platform,
   NativeSyntheticEvent,
   TextInputSelectionChangeEventData,
+  SafeAreaView,
 } from "react-native";
 import { addItems } from "../../wdb/wdbService";
 import { List } from "../../classes/List";
 import { Item } from "../../classes/Item";
 import { v4 as uuidv4 } from "uuid";
 
-/**
- * A lightweight replacement for NSRange
- */
 export interface Range {
   location: number;
   length: number;
 }
 
 export type ParserViewProps = {
-  /**
-   * Controls visibility from parent component
-   */
   visible: boolean;
-  /**
-   * Callback invoked when the user taps the × or the OS back‑gesture.
-   */
   onDismiss: () => void;
-  /**
-   * Items created by the parser will be persisted to this List.
-   */
   list: List;
 };
 
-/**
- * A simplified parser that produces content‑only Items.
- * — No title handling
- * — Single highlight colour (blue)
- * — Optional auto‑fill that splits on blank lines
- */
-const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => {
-  /*****************************************************
-   * -------------------- STATE ---------------------- *
-   *****************************************************/
-  const [plainText, setPlainText] = useState<string>("");
-  /** Current selection range inside the <TextInput>. */
-  const [selection, setSelection] = useState<Range>({ location: 0, length: 0 });
-  /** User‑selected (or auto‑generated) segments to convert into Items. */
-  const [segments, setSegments] = useState<Range[]>([]);
-  /** Toggles whether the current highlight set came from auto‑fill. */
-  const [autoFilled, setAutoFilled] = useState<boolean>(false);
+/** Fallback: one‑or‑more new‑lines of either LF or CRLF */
+const GENERIC_DELIM = /\r?\n+/g;
 
-  /*****************************************************
-   * ----------------- UTILITIES --------------------- *
-   *****************************************************/
-  /** Does the cursor sit inside *any* of the provided ranges? Returns index or −1. */
+/**
+ * Regex helpers
+ */
+const NL_RE = /\r?\n/g;            // single newline token (CRLF or LF)
+const SP_TAB = /[ \t]+/g;           // spaces and tabs only – no newlines
+
+const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+
+/**
+ * Build a constant‑width wildcard segment (e.g. .{3})
+ */
+const wild = (n: number) => (n > 0 ? `.{${n}}` : "");
+
+/**
+ * Infer a delimiter based _only_ on the gaps between **consecutive** highlighted ranges.
+ * – requires ≥ 2 manual highlights
+ * – ignores any text before the first highlight
+ *
+ *  ❖ Rule 2 (non‑newline single‑char delimiter) takes priority over Rule 3 (newline delimiter).
+ */
+function inferDelimiter(text: string, ranges: Range[]): RegExp | null {
+  if (ranges.length < 2) return null;
+
+  const sorted = [...ranges].sort((a, b) => a.location - b.location);
+  const gaps = sorted.slice(0, -1).map((r, i) =>
+    text.slice(r.location + r.length, sorted[i + 1].location)
+  );
+
+  // ───────────────────────────────────────────── Rule 2 ──────
+  const anyNL = gaps.some((g) => NL_RE.test(g));
+  if (!anyNL) {
+    const distinctChars = new Set(gaps.join(""));
+    if (distinctChars.size === 1) {
+      const ch = [...distinctChars][0]!;
+      const counts = gaps.map((g) => g.length);
+      const uniform = counts.every((c) => c === counts[0]);
+      if (uniform) {
+        return new RegExp(`${reEscape(ch)}{${counts[0]}}`, "g");
+      }
+    }
+  }
+
+  // ───────────────────────────────────────────── Rule 3 ──────
+  const nlCounts = gaps.map((g) => (g.match(NL_RE) || []).length);
+  const uniformNL = nlCounts.every((c) => c === nlCounts[0]);
+  if (!uniformNL || nlCounts[0] === 0) return GENERIC_DELIM;
+  const NL = nlCounts[0];
+
+  // Build wildcard counts around/between NL tokens using FIRST gap as the template
+  // After stripping space/tab sequences adjacent to NL tokens.
+  const template = gaps[0];
+  const parts = template.split(NL_RE); // length = NL+1
+  const counts: number[] = parts.map((p) => p.replace(SP_TAB, "").length);
+
+  // Compose pattern: wildcard + [ \t]*\\r?\\n[ \t]* segments
+  let pattern = "";
+  for (let i = 0; i < NL; i++) {
+    pattern += wild(counts[i]);
+    pattern += `[\\t ]*\\r?\\n[\\t ]*`;
+  }
+  pattern += wild(counts[NL]);
+
+  return new RegExp(pattern || GENERIC_DELIM.source, "g");
+}
+
+const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => {
+  const [plainText, setPlainText] = useState("");
+  const [selection, setSelection] = useState<Range>({ location: 0, length: 0 });
+  const [segments, setSegments] = useState<Range[]>([]);
+  const [autoFilled, setAutoFilled] = useState(false);
+
   const cursorInRanges = useCallback(
-    (rs: Range[]): number =>
+    (rs: Range[]) =>
       rs.findIndex(
-        r => selection.location >= r.location && selection.location <= r.location + r.length,
+        (r) => selection.location >= r.location && selection.location <= r.location + r.length
       ),
-    [selection],
+    [selection]
   );
   const cursorInSegment = cursorInRanges(segments);
 
-  /** Insert or replace a range, collapsing overlaps & adjacencies. */
   const upsertRange = (ranges: Range[], next: Range): Range[] => {
     const overlap = (a: Range, b: Range) => {
       const aEnd = a.location + a.length;
       const bEnd = b.location + b.length;
-      if (aEnd === b.location || bEnd === a.location) return 0; // touching
+      if (aEnd === b.location || bEnd === a.location) return 0;
       return Math.max(0, Math.min(aEnd, bEnd) - Math.max(a.location, b.location));
     };
-    const filtered = ranges.filter(r => overlap(r, next) <= 0);
-    return [...filtered, next].sort((a, b) => a.location - b.location);
+    return [...ranges.filter((r) => overlap(r, next) <= 0), next].sort((a, b) => a.location - b.location);
   };
 
-  /*****************************************************
-   * ---------------- TEXT INPUT --------------------- *
-   *****************************************************/
   const onChangeText = (t: string) => {
     setPlainText(t);
-    setSegments([]);         // wipe highlights – cheaper than re‑offsetting
+    setSegments([]);
     setAutoFilled(false);
   };
-
   const onSelectionChange = (
-    e: NativeSyntheticEvent<TextInputSelectionChangeEventData>,
+    e: NativeSyntheticEvent<TextInputSelectionChangeEventData>
   ) => {
     const { start, end } = e.nativeEvent.selection;
     setSelection({ location: start, length: end - start });
   };
 
-  /*****************************************************
-   * --------------- HIGHLIGHT ACTIONS --------------- *
-   *****************************************************/
   const toggleHighlight = () => {
-    if (selection.length === 0) return;
+    if (!selection.length) return;
     if (cursorInSegment >= 0) {
-      // remove existing
-      setSegments(prev => prev.filter((_, i) => i !== cursorInSegment));
+      setSegments((prev) => prev.filter((_, i) => i !== cursorInSegment));
     } else {
-      setSegments(prev => upsertRange(prev, { ...selection }));
+      setSegments((prev) => upsertRange(prev, { ...selection }));
     }
     setAutoFilled(false);
   };
 
-  /*****************************************************
-   * -------------------- AUTOFILL ------------------- *
-   *****************************************************/
   const autoFill = useCallback(() => {
     if (autoFilled) {
-      setSegments([]);        // clear auto‑fill highlights
+      setSegments((prev) => prev.slice(0, segments.length));
       setAutoFilled(false);
       return;
     }
 
+    if (segments.length < 2) return;
+    const delim = inferDelimiter(plainText, segments) ?? GENERIC_DELIM;
+    const sorted = [...segments].sort((a, b) => a.location - b.location);
+    const last = sorted[sorted.length - 1];
+    const startPos = last.location + last.length;
+
     const next: Range[] = [];
-    let offset = 0;
-    plainText.split(/\n{2,}/).forEach(block => {
-      const trimmed = block.trim();
-      if (!trimmed) {
-        offset += block.length + 2;
-        return;
+    let cursor = startPos;
+    let match: RegExpExecArray | null;
+    delim.lastIndex = startPos;
+
+    while ((match = delim.exec(plainText))) {
+      const end = match.index;
+      const slice = plainText.slice(cursor, end);
+      const content = slice.replace(/^\s+|\s+$/g, "");
+      if (content) {
+        const loc = cursor + slice.indexOf(content);
+        next.push({ location: loc, length: content.length });
       }
-      next.push({ location: offset + block.indexOf(trimmed), length: trimmed.length });
-      offset += block.length + 2;
-    });
+      cursor = match.index + match[0].length;
+    }
+    const tail = plainText.slice(cursor);
+    const tailContent = tail.replace(/^\s+|\s+$/g, "");
+    if (tailContent) {
+      const loc = cursor + tail.indexOf(tailContent);
+      next.push({ location: loc, length: tailContent.length });
+    }
 
-    setSegments(next);
+    setSegments([...segments, ...next]);
     setAutoFilled(true);
-  }, [plainText, autoFilled]);
+  }, [autoFilled, plainText, segments]);
 
-  /*****************************************************
-   * ---------------- ITEM CONSTRUCTION -------------- *
-   *****************************************************/
   const makeItems = (): Item[] => {
-    const ranges = segments.length
-      ? segments
-      : [
-          {
-            location: 0,
-            length: plainText.trim().length,
-          },
-        ];
-
-    return ranges
+    const src = segments.length ? segments : [{ location: 0, length: plainText.trim().length }];
+    return src
       .sort((a, b) => a.location - b.location)
       .map((r, idx) => {
-        const content = plainText.slice(r.location, r.location + r.length).trim();
+        // Extract the highlighted text, trim, replace tabs with &nbsp; and newlines with <br>
+        const raw = plainText.slice(r.location, r.location + r.length).trim();
+        const htmlContent = raw
+          .replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;") // 4 non-breaking spaces per tab
+          .replace(/\r?\n/g, '<br>');
         return new Item(
           uuidv4(),
           list.id,
-          content,
-          null,          // image
-          idx,           // order
+          htmlContent,
+          null,
+          idx,
           new Date(),
-          new Date(),
+          new Date()
         );
       });
   };
-
   const persist = async () => {
-    const items = makeItems().filter(i => i.content.length); // ignore blanks
+    const items = makeItems().filter((i) => i.content);
     if (items.length) await addItems(items);
     onDismiss();
   };
 
-  /*****************************************************
-   * ----------------- HIGHLIGHT VIEW ---------------- *
-   *****************************************************/
-  const highlightedPreview = useMemo(() => {
-    if (segments.length === 0) return null;
-    const segs: { text: string; highlight: boolean }[] = [];
+  // Highlight overlay with trimmed-space debug highlights
+  const HighlightLayer = useMemo(() => {
+    if (!plainText) return null;
+    const parts: { text: string; hl: boolean; ws: boolean }[] = [];
     let cursor = 0;
     const ordered = [...segments].sort((a, b) => a.location - b.location);
-
-    ordered.forEach(r => {
-      if (cursor < r.location) segs.push({ text: plainText.slice(cursor, r.location), highlight: false });
-      segs.push({ text: plainText.slice(r.location, r.location + r.length), highlight: true });
+    ordered.forEach((r) => {
+      if (cursor < r.location) {
+        const pre = plainText.slice(cursor, r.location);
+        parts.push({ text: pre, hl: false, ws: /^[ \t]+$/.test(pre) });
+      }
+      const mid = plainText.slice(r.location, r.location + r.length);
+      parts.push({ text: mid, hl: true, ws: false });
       cursor = r.location + r.length;
     });
-    if (cursor < plainText.length) segs.push({ text: plainText.slice(cursor), highlight: false });
-
+    if (cursor < plainText.length) {
+      const post = plainText.slice(cursor);
+      parts.push({ text: post, hl: false, ws: /^[ \t]+$/.test(post) });
+    }
     return (
-      <Text style={styles.previewText} selectable>
-        {segs.map((s, i) =>
-          s.highlight ? (
-            <View
-              key={i}
-              style={{
-                backgroundColor: "#0a84ff",
-                borderRadius: 4,
-                paddingHorizontal: 2,
-                marginRight: 1,
-              }}
-            >
-              <Text style={{ color: "#fff" }}>{s.text}</Text>
-            </View>
-          ) : (
-            <Text key={i}>{s.text}</Text>
-          ),
-        )}
+      <Text style={styles.hlText} pointerEvents="none">
+        {parts.map((p, i) => (
+          <Text
+            key={i}
+            style={
+              p.hl
+                ? styles.hlSpan
+                : p.ws
+                ? styles.wsSpan
+                : undefined
+            }
+          >{p.text}</Text>
+        ))}
       </Text>
     );
   }, [plainText, segments]);
 
-  /*****************************************************
-   * -------------------- RENDER --------------------- *
-   *****************************************************/
   return (
     <Modal visible={visible} onRequestClose={onDismiss} animationType="slide">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.container}
-      >
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Parser</Text>
-          <Pressable onPress={persist}>
-            <Text style={styles.headerIcon}>✔︎</Text>
-          </Pressable>
-        </View>
-
-        {/* INPUT + PREVIEW */}
-        <ScrollView style={styles.body} keyboardDismissMode="interactive">
-          <TextInput
-            style={styles.input}
-            multiline
-            value={plainText}
-            onChangeText={onChangeText}
-            placeholder="Paste text here…"
-            selection={{ start: selection.location, end: selection.location + selection.length }}
-            onSelectionChange={onSelectionChange}
-          />
-          {highlightedPreview}
-        </ScrollView>
-
-        {/* ACTIONS */}
-        <View style={styles.actions}>
-          <Pressable style={styles.actionBtn} onPress={autoFill}>
-            <Text style={styles.actionTxt}>{autoFilled ? "Clear Auto‑Fill" : "Auto‑Fill"}</Text>
-          </Pressable>
-          <Pressable style={styles.actionBtn} onPress={toggleHighlight}>
-            <Text style={styles.actionTxt}>
-              {cursorInSegment >= 0 ? "Remove Highlight" : "Highlight"}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.closeBtn} onPress={onDismiss}>
-            <Text style={styles.actionTxt}>×</Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.container}
+        >
+          <View style={styles.header}>
+            <Pressable onPress={onDismiss} hitSlop={12}><Text style={styles.close}>×</Text></Pressable>
+            <Text style={styles.title}>Parse Items</Text>
+            <Pressable onPress={persist} hitSlop={12}><Text style={styles.done}>✔︎</Text></Pressable>
+          </View>
+          <ScrollView style={styles.scroll} keyboardDismissMode="interactive">
+            <View style={styles.overlay}>{HighlightLayer}</View>
+            <TextInput
+              style={styles.input}
+              multiline
+              value={plainText}
+              onChangeText={onChangeText}
+              selection={{ start: selection.location, end: selection.location + selection.length }}
+              onSelectionChange={onSelectionChange}
+              placeholder="Paste text here…"
+            />
+          </ScrollView>
+          <View style={styles.actions}>
+            <Pressable style={styles.btn} onPress={autoFill}><Text style={styles.btnTxt}>{autoFilled ? "Clear" : "Auto‑Fill"}</Text></Pressable>
+            <Pressable style={styles.btn} onPress={toggleHighlight}><Text style={styles.btnTxt}>{cursorInSegment >= 0 ? "Un‑highlight" : "Highlight"}</Text></Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 };
 
 export default ParserView;
 
-/*****************************************************
- * -------------------- STYLES ---------------------- *
- *****************************************************/
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f2f7",
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  headerIcon: {
-    fontSize: 20,
-  },
-  body: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  input: {
-    minHeight: 140,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#ffffff",
-    textAlignVertical: "top",
-    marginBottom: 8,
-  },
-  previewText: {
-    fontSize: 16,
-    lineHeight: 22,
-    paddingVertical: 12,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "space-evenly",
-    padding: 12,
-  },
-  actionBtn: {
-    backgroundColor: "#d1d1d6",
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  closeBtn: {
-    marginLeft: "auto",
-    backgroundColor: "#ff3b30",
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  actionTxt: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  safeArea: { flex: 1, backgroundColor: "#f2f2f7" },
+  container: { flex: 1 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: "#d1d1d6" },
+  title: { fontSize: 18, fontWeight: "600" },
+  close: { fontSize: 24 },
+  done: { fontSize: 20 },
+  scroll: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
+  overlay: { position: "absolute", top: 0, left: 0, right: 0 },
+  hlText: { fontSize: 16, lineHeight: 22 },
+  hlSpan: { backgroundColor: "#0a84ff", color: "#fff", borderRadius: 4, paddingHorizontal: 2 },
+  wsSpan: { backgroundColor: "rgba(255,0,0,0.3)" },
+  input: { fontSize: 16, lineHeight: 22, color: "#000", backgroundColor: "transparent", padding: 0, textAlignVertical: "top" },
+  actions: { flexDirection: "row", justifyContent: "space-evenly", padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: "#d1d1d6", backgroundColor: "#f9f9fb" },
+  btn: { backgroundColor: "#d1d1d6", borderRadius: 8, paddingVertical: 10, paddingHorizontal: 18 },
+  btnTxt: { fontSize: 14, fontWeight: "500" },
 });
