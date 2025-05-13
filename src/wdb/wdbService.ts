@@ -621,7 +621,9 @@ export async function rotateTodayItemForList(userID: string, list: List, directi
     return;
   }
   if (items.length === 1) {
-    // console.log('[rotateTodayItemForList] only one item, no rotation needed');
+    // Always set currentItem to the only item's id
+    list.currentItem = items[0].id;
+    await updateLibraryList(userID, list.folderID, list.id, { currentItem: list.currentItem });
     return;
   }
 

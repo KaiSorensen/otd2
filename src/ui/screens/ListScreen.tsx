@@ -363,28 +363,52 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const handleAddItem = async () => {
     if (!currentUser || currentUser.id !== list.ownerID) return;
 
-    const newItem = new Item(
-      uuidv4(),
-      list.id,
-      '',
-      [],
-      items.length,
-      new Date(),
-      new Date()
+    Alert.alert(
+      'Add Item',
+      'How would you like to add items?',
+      [
+        {
+          text: 'Parser',
+          onPress: () => setIsParserModalVisible(true),
+        },
+        {
+          text: 'Single Item',
+          onPress: async () => {
+            const newItem = new Item(
+              uuidv4(),
+              list.id,
+              '',
+              [],
+              items.length,
+              new Date(),
+              new Date()
+            );
+            await storeNewItem(newItem);
+            setItems([...items, newItem]);
+            // If this is the first item or currentItem is not set, set it
+            if (!list.currentItem) {
+              list.currentItem = newItem.id;
+              await list.save(currentUser.id);
+            }
+            (navigation as any).navigate('Item', {
+              item: newItem,
+              canEdit: true,
+              onItemDone: (result: { item: Item, deleted: boolean }) => {
+                if (result.deleted) {
+                  setItems((prev) => prev.filter(i => i.id !== newItem.id));
+                } else {
+                  setItems((prev) => prev.map(i => i.id === newItem.id ? result.item : i));
+                }
+              }
+            });
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
     );
-    await storeNewItem(newItem);
-    setItems([...items, newItem]);
-    (navigation as any).navigate('Item', {
-      item: newItem,
-      canEdit: true,
-      onItemDone: (result: { item: Item, deleted: boolean }) => {
-        if (result.deleted) {
-          setItems((prev) => prev.filter(i => i.id !== newItem.id));
-        } else {
-          setItems((prev) => prev.map(i => i.id === newItem.id ? result.item : i));
-        }
-      }
-    });
   };
 
   // Function to handle deleting an item

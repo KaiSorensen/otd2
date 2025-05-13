@@ -82,12 +82,17 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, isNew = false, onItemDone
   const handleBack = async () => {
     const trimmed = content.trim();
     if (trimmed.length === 0) {
-      // Delete the item if blank
+      // Only delete if the item is actually empty
       await deleteItem(item.listID, item.id);
       if (onItemDone) onItemDone({ item, deleted: true });
     } else {
       item.content = content;
-      await item.save();
+      // Always save if not empty
+      if (isNew) {
+        await storeNewItem(item);
+      } else {
+        await item.save();
+      }
       if (onItemDone) onItemDone({ item, deleted: false });
     }
     onBack && onBack();
@@ -100,12 +105,17 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, isNew = false, onItemDone
     try {
       const trimmed = content.trim();
       if (trimmed.length === 0) {
-        // Delete the item if blank
+        // Only delete if the item is actually empty
         await deleteItem(item.listID, item.id);
         if (onItemDone) onItemDone({ item, deleted: true });
       } else {
         item.content = content;
-        await item.save();
+        // Always save if not empty
+        if (isNew) {
+          await storeNewItem(item);
+        } else {
+          await item.save();
+        }
         setHasChanges(false);
         if (onItemDone) onItemDone({ item, deleted: false });
       }
