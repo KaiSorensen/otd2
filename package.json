@@ -58,6 +58,7 @@
     "react-native-udp": "2.7.0",
     "react-native-url-polyfill": "2.0.0",
     "react-native-vector-icons": "10.2.0",
+    "react-native-webview": "^13.13.5",
     "readable-stream": "1.0.33",
     "stream": "0.0.3",
     "stream-browserify": "3.0.0",
