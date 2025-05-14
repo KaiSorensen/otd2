@@ -571,15 +571,49 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
             canEdit: !!(currentUser && currentUser.id === list.ownerID),
             onItemDone: (result: { item: Item, deleted: boolean }) => {
               if (result.deleted) {
-                setItems((prev) => prev.filter(i => i.id !== item.id));
+                const afterDelete = masterItems.filter(i => i.id !== item.id);
+                setMasterItems(afterDelete);
+                let filtered = afterDelete;
+                if (searchTerm.trim().length > 0) {
+                  filtered = afterDelete.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+                }
+                setItems(sortItems(filtered, sortOrder));
               } else {
-                setItems((prev) => prev.map(i => i.id === item.id ? result.item : i));
+                setMasterItems(prev => prev.map(i => i.id === item.id ? result.item : i));
+                let filtered = masterItems.map(i => i.id === item.id ? result.item : i);
+                if (searchTerm.trim().length > 0) {
+                  filtered = filtered.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+                }
+                setItems(sortItems(filtered, sortOrder));
               }
             }
           });
         }
       }}
     >
+      {/* Floating order index number */}
+      <View style={{
+        position: 'absolute',
+        top: -8,
+        left: -8,
+        backgroundColor: colors.primary,
+        borderRadius: 12,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        zIndex: 2,
+        minWidth: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: colors.card,
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
+        elevation: 2,
+      }}>
+        <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>{(item.orderIndex ?? 0) + 1}</Text>
+      </View>
       <View style={styles.resultContent}>
         <Text style={[styles.resultDescription, { color: colors.textSecondary }]} numberOfLines={2}>
           {stripHtml(item.content)}
