@@ -208,11 +208,27 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
   );
 };
 
+// Helper function to sort items
+function sortItems(items: Item[], sortOrder: SortOrderType): Item[] {
+  switch (sortOrder) {
+    case 'alphabetical':
+      return [...items].sort((a, b) => (a.content || '').localeCompare(b.content || ''));
+    case 'date-first':
+      return [...items].sort((a, b) => (b.createdAt.getTime() - a.createdAt.getTime()));
+    case 'date-last':
+      return [...items].sort((a, b) => (a.createdAt.getTime() - b.createdAt.getTime()));
+    case 'manual':
+    default:
+      return [...items].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+  }
+}
+
 const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, initialItemId }) => {
   const { currentUser, forceUserUpdate } = useAuth();
   const { colors, isDarkMode } = useColors();
   const [list, setList] = useState<List>(initialList);
-  const [items, setItems] = useState<Item[]>([]);
+  const [masterItems, setMasterItems] = useState<Item[]>([]); // all items loaded from DB
+  const [items, setItems] = useState<Item[]>([]); // filtered/sorted for display
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [isSortDropdownOpen, setSortDropdownOpen] = useState(false);
@@ -288,53 +304,33 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     setHasHandledNotification(false);
   }, [initialList.id]);
 
-  // Handle searching items within the list
-  useEffect(() => {
-    const performSearch = async () => {
-      setLoading(true);
-      try {
-        if (searchTerm.trim().length > 0) {
-          if (list.folderID) {
-            const searchedItems = await getItemsFromListBySubstring(list, searchTerm.trim());
-            setItems(searchedItems);
-          } else {
-            const allItems = await remote_getItemsInList(list.id);
-            setItems(allItems.filter(i => i.content.includes(searchTerm)));
-          }
-        } else {
-          await fetchItems();
-        }
-      } catch (error) {
-        console.error('Error searching items:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    performSearch();
-  }, [searchTerm]);
-
-  // Function to fetch items
+  // Fetch items from DB and update masterItems and items
   const fetchItems = async () => {
     setLoading(true);
     try {
-      // if the list is in our library, then we need to fetch the items from the library
+      let listItems: Item[] = [];
       if (list.folderID) {
-        // // console.log("fetching items from library")
-        const listItems = await local_getItemsInList(list);
-        setItems(listItems);
+        listItems = await local_getItemsInList(list);
       } else {
-        // // console.log("fetching items from remote")
-        // if the list is not in our library, then we need to fetch the items from the remote database
-        const listItems = await remote_getItemsInList(list.id);
-        setItems(listItems);
+        listItems = await remote_getItemsInList(list.id);
       }
-      
+      setMasterItems(listItems);
+      setItems(sortItems(listItems, sortOrder));
     } catch (error) {
       console.error('Error fetching items:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // When searchTerm or sortOrder changes, filter/sort in-memory
+  useEffect(() => {
+    let filtered = masterItems;
+    if (searchTerm.trim().length > 0) {
+      filtered = masterItems.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+    }
+    setItems(sortItems(filtered, sortOrder));
+  }, [searchTerm, sortOrder, masterItems]);
 
   // Function to fetch user's folders
   const fetchUserFolders = async () => {
@@ -386,10 +382,9 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     }
   };
 
-  // Function to handle adding a new item
+  // When adding or deleting, update masterItems and items in-memory
   const handleAddItem = async () => {
     if (!currentUser || currentUser.id !== list.ownerID) return;
-
     Alert.alert(
       'Add Item',
       'How would you like to add items?',
@@ -406,13 +401,19 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               list.id,
               '',
               [],
-              items.length,
+              masterItems.length,
               new Date(),
               new Date()
             );
             await storeNewItem(newItem);
-            setItems([...items, newItem]);
-            // If this is the first item or currentItem is not set, set it
+            const updated = [...masterItems, newItem];
+            setMasterItems(updated);
+            // update items view as well
+            let filtered = updated;
+            if (searchTerm.trim().length > 0) {
+              filtered = updated.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+            }
+            setItems(sortItems(filtered, sortOrder));
             if (!list.currentItem) {
               list.currentItem = newItem.id;
               await list.save(currentUser.id);
@@ -422,9 +423,20 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               canEdit: true,
               onItemDone: (result: { item: Item, deleted: boolean }) => {
                 if (result.deleted) {
-                  setItems((prev) => prev.filter(i => i.id !== newItem.id));
+                  const afterDelete = updated.filter(i => i.id !== newItem.id);
+                  setMasterItems(afterDelete);
+                  let filtered = afterDelete;
+                  if (searchTerm.trim().length > 0) {
+                    filtered = afterDelete.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+                  }
+                  setItems(sortItems(filtered, sortOrder));
                 } else {
-                  setItems((prev) => prev.map(i => i.id === newItem.id ? result.item : i));
+                  setMasterItems(prev => prev.map(i => i.id === newItem.id ? result.item : i));
+                  let filtered = updated.map(i => i.id === newItem.id ? result.item : i);
+                  if (searchTerm.trim().length > 0) {
+                    filtered = filtered.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+                  }
+                  setItems(sortItems(filtered, sortOrder));
                 }
               }
             });
@@ -438,13 +450,17 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     );
   };
 
-  // Function to handle deleting an item
   const handleDeleteItem = async (item: Item) => {
     if (!currentUser || currentUser.id !== list.ownerID) return;
-
     try {
       await deleteItem(currentUser.id, item.id);
-      setItems(items.filter(i => i.id !== item.id));
+      const afterDelete = masterItems.filter(i => i.id !== item.id);
+      setMasterItems(afterDelete);
+      let filtered = afterDelete;
+      if (searchTerm.trim().length > 0) {
+        filtered = afterDelete.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+      }
+      setItems(sortItems(filtered, sortOrder));
     } catch (error) {
       console.error('Error deleting item:', error);
       Alert.alert('Error', 'Failed to delete item. Please try again.');
@@ -642,48 +658,49 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
       {/* Scrollable content */}
       <ScrollView style={styles.scrollContent}>
         {/* List details section */}
-        <View style={[styles.detailsSection, { borderBottomColor: colors.divider }]}>
-          {/* <View style={styles.coverImageContainer}>
-            {list.coverImageURL ? (
-              <Image source={{ uri: list.coverImageURL }} style={styles.coverImage} />
-            ) : (
-              <View style={[styles.coverImagePlaceholder, { backgroundColor: colors.backgroundSecondary }]} />
-            )}
-          </View> */}
-          
-          <View style={styles.listInfo}>
-            <Text style={[styles.listTitle, { color: colors.textPrimary }]}>{list.title}</Text>
+        {!isEditMode && (
+          <View style={[styles.detailsSection, { borderBottomColor: colors.divider }]}>
+            {/* <View style={styles.coverImageContainer}>
+              {list.coverImageURL ? (
+                <Image source={{ uri: list.coverImageURL }} style={styles.coverImage} />
+              ) : (
+                <View style={[styles.coverImagePlaceholder, { backgroundColor: colors.backgroundSecondary }]} />
+              )}
+            </View> */}
             
-            {/* Owner info with profile link */}
-            {listOwner && (
-              <TouchableOpacity 
-                style={[styles.ownerContainer, { backgroundColor: colors.backgroundSecondary }]} 
-                onPress={() => (navigation as any).navigate('User', { userID: listOwner.id })}
-              >
-                <View style={[styles.ownerAvatarContainer, { backgroundColor: colors.backgroundTertiary }]}>
-                  {listOwner.avatarURL ? (
-                    <Image source={{ uri: listOwner.avatarURL }} style={styles.ownerAvatar} />
-                  ) : (
-                    <Text style={[styles.ownerAvatarText, { color: colors.textTertiary }]}>
-                      {listOwner.username.charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
-                <Text style={[styles.ownerName, { color: colors.textSecondary }]}>
-                  {listOwner.username}
+            <View style={styles.listInfo}>
+              <Text style={[styles.listTitle, { color: colors.textPrimary }]}>{list.title}</Text>
+              
+              {/* Owner info with profile link */}
+              {listOwner && (
+                <TouchableOpacity 
+                  style={[styles.ownerContainer, { backgroundColor: colors.backgroundSecondary }]} 
+                  onPress={() => (navigation as any).navigate('User', { userID: listOwner.id })}
+                >
+                  <View style={[styles.ownerAvatarContainer, { backgroundColor: colors.backgroundTertiary }]}>
+                    {listOwner.avatarURL ? (
+                      <Image source={{ uri: listOwner.avatarURL }} style={styles.ownerAvatar} />
+                    ) : (
+                      <Text style={[styles.ownerAvatarText, { color: colors.textTertiary }]}>
+                        {listOwner.username.charAt(0).toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[styles.ownerName, { color: colors.textSecondary }]}>
+                    {listOwner.username}
+                  </Text>
+                  <Icon name="chevron-forward" size={16} color={colors.iconSecondary} />
+                </TouchableOpacity>
+              )}
+              
+              {list.description && (
+                <Text style={[styles.listDescription, { color: colors.textSecondary }]}>
+                  {stripHtml(list.description)}
                 </Text>
-                <Icon name="chevron-forward" size={16} color={colors.iconSecondary} />
-              </TouchableOpacity>
-            )}
-            
-            {list.description && (
-              <Text style={[styles.listDescription, { color: colors.textSecondary }]}>
-                {stripHtml(list.description)}
-              </Text>
-            )}
+              )}
+            </View>
           </View>
-        </View>
-        
+        )}
         {/* Search items input */}
         <View style={[styles.searchBar, { backgroundColor: colors.inputBackground, shadowColor: colors.shadow, borderColor: colors.inputBorder, borderWidth: 1 }]}>  
           <Icon name="search-outline" size={24} color={colors.iconSecondary} style={styles.searchIcon} />
@@ -703,7 +720,42 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
             </TouchableOpacity>
           )}
         </View>
-        
+        {/* Sort order chips (edit mode, owner only) */}
+        {isEditMode && currentUser && currentUser.id === list.ownerID && (
+          <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.divider }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}
+            >
+              {["date-first", "date-last", "alphabetical", "manual"].map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    marginRight: 8,
+                    backgroundColor: sortOrder === option ? colors.primary : colors.backgroundSecondary,
+                  }}
+                  onPress={async () => {
+                    setSortOrder(option as SortOrderType);
+                    await handleSettingsSave({ sortOrder: option as SortOrderType });
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: sortOrder === option ? 'white' : colors.textSecondary,
+                      fontWeight: sortOrder === option ? '600' : undefined,
+                    }}
+                  >
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
         {/* Items list */}
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />

@@ -562,7 +562,7 @@ export async function initializeTodayItem(list: List) {
 
 export async function getItemsFromListBySubstring(list: List, substring: string): Promise<Item[]> {
   const items = await getItemsInList(list);
-  return items.filter((item) => item.content.includes(substring));
+  return items.filter((item) => item.content.toLowerCase().includes(substring.toLowerCase()));
 }
 
 export async function syncDateLastRotatedTodayLists(user: User) {
