@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,18 +19,21 @@ import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { User } from '../../classes/User';
 import { Folder } from '../../classes/Folder';
-import { addItems, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList, getItemsFromListBySubstring } from '../../wdb/wdbService';
+import { addItems, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList, changeItemOrder } from '../../wdb/wdbService';
 import { getItemsInList as remote_getItemsInList, retrieveUser } from '../../supabase/databaseService';
-// import ListImage from '../components/ListImage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../contexts/UserContext';
 import { useColors } from '../../contexts/ColorContext';
-import ItemScreen from './ItemScreen';
-import UserScreen from './UserScreen';
 import ListSettingsModal from '../components/ListSettingsModal';
 import { v4 as uuidv4 } from 'uuid';
 import ParserView from '../components/Parser';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+import DraggableFlatList, {
+  RenderItemParams,
+} from 'react-native-draggable-flatlist';
+
 
 
 // Helper function to strip HTML tags for plain text display
@@ -53,21 +56,21 @@ interface SortOrderDropdownProps {
 // Dropdown component for sort order
 const SortOrderDropdown: React.FC<SortOrderDropdownProps> = ({ value, onChange, isOpen, toggleOpen, colors }) => {
   const options: SortOrderType[] = ["date-first", "date-last", "alphabetical", "manual"];
-  
+
   return (
     <View style={[styles.dropdownContainer, { borderColor: colors.divider }]}>
-      <TouchableOpacity 
-        style={[styles.dropdownHeader, { backgroundColor: colors.backgroundSecondary }]} 
+      <TouchableOpacity
+        style={[styles.dropdownHeader, { backgroundColor: colors.backgroundSecondary }]}
         onPress={toggleOpen}
       >
         <Text style={[styles.dropdownHeaderText, { color: colors.textPrimary }]}>Sort: {value}</Text>
-        <Icon 
-          name={isOpen ? "chevron-up" : "chevron-down"} 
-          size={24} 
+        <Icon
+          name={isOpen ? "chevron-up" : "chevron-down"}
+          size={24}
           color={colors.iconSecondary}
         />
       </TouchableOpacity>
-      
+
       {isOpen && (
         <View style={styles.dropdownOptions}>
           {options.map((option) => (
@@ -83,7 +86,7 @@ const SortOrderDropdown: React.FC<SortOrderDropdownProps> = ({ value, onChange, 
                 toggleOpen();
               }}
             >
-              <Text 
+              <Text
                 style={[
                   styles.dropdownOptionText,
                   { color: colors.textSecondary },
@@ -140,7 +143,7 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
               <Icon name="close" size={24} color={colors.iconPrimary} />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.modalBody}>
             <View style={[styles.inputContainer, { borderBottomColor: colors.divider }]}>
               <Text style={[styles.label, { color: colors.textPrimary }]}>Select Folder</Text>
@@ -153,8 +156,8 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
                     onPress={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
                   >
                     <Text style={[styles.dropdownButtonText, { color: colors.textPrimary }]}>
-                      {selectedFolderId ? 
-                        folders.find(f => f.id === selectedFolderId)?.name || 'Unknown' : 
+                      {selectedFolderId ?
+                        folders.find(f => f.id === selectedFolderId)?.name || 'Unknown' :
                         'Select a folder'}
                     </Text>
                     <Icon
@@ -163,7 +166,7 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
                       color={colors.iconSecondary}
                     />
                   </TouchableOpacity>
-                  
+
                   {isFolderDropdownOpen && (
                     <View style={[styles.dropdownContent, { backgroundColor: colors.backgroundSecondary }]}>
                       {folders.map(folder => (
@@ -242,8 +245,9 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const route = useRoute();
   const navigation = useNavigation();
   const [hasHandledNotification, setHasHandledNotification] = useState(false);
+  const persistOrderTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  
+
   // Add useEffect to check if list is in library and use that version if it exists
   useEffect(() => {
     if (currentUser) {
@@ -335,7 +339,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   // Function to fetch user's folders
   const fetchUserFolders = async () => {
     if (!currentUser) return;
-    
+
     setLoadingFolders(true);
     try {
       // First get the populated user to ensure we have the latest folder data
@@ -352,6 +356,31 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     setListOwner(owner);
   };
 
+  // Optimistic reorder: update UI immediately, then persist.
+  const handleManualReorder = useCallback(
+    (newOrder: Item[]) => {
+      // 1️⃣ Optimistic UI update: update each item's orderIndex locally
+      newOrder.forEach((item, idx) => { item.orderIndex = idx; });
+      setMasterItems([...newOrder]);
+      setItems([...newOrder]);
+
+      // 2️⃣ Debounce persistence for smooth UI
+      if (persistOrderTimeout.current) {
+        clearTimeout(persistOrderTimeout.current);
+      }
+      persistOrderTimeout.current = setTimeout(async () => {
+        try {
+          await changeItemOrder(newOrder.map(item => item.id));
+        } catch (err) {
+          console.error('Persist reorder failed:', err);
+          // rollback: re-fetch from DB
+          fetchItems();
+        }
+      }, 500);
+    },
+    [list.id, fetchItems],
+  );
+
   // Handle settings save
   const handleSettingsSave = async (updates: Partial<List>) => {
     try {
@@ -363,7 +392,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
 
       // Update the list object
       Object.assign(list, updates);
-      
+
       // Save to database
       if (currentUser) {
         await list.save(currentUser.id);
@@ -470,7 +499,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   // Function to handle adding list to library
   const handleAddToLibrary = async (folderId: string) => {
     if (!currentUser) return;
-    
+
     try {
       await storeNewList(list, currentUser.id, folderId);
       if (currentUser.id !== list.ownerID) {
@@ -559,8 +588,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
 
   // Render an item row
   const renderItem = ({ item }: { item: Item }) => (
-    <TouchableOpacity 
-      style={[styles.resultItem, { 
+    <TouchableOpacity
+      style={[styles.resultItem, {
         backgroundColor: colors.card,
         shadowColor: colors.shadow
       }]}
@@ -620,7 +649,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
         </Text>
       </View>
       {isEditMode ? (
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => handleDeleteItem(item)}
           style={styles.deleteButton}
         >
@@ -636,12 +665,11 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const { width, height } = Dimensions.get('window');
   const headerHeight = Math.min(height * 0.4, 300);
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-      
+  // Header, search bar, and sort chips as a single header component
+  const renderListHeader = () => (
+    <>
       {/* Header with back button and list title */}
-      <View style={[styles.header, { borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { borderBottomColor: colors.divider }]}> 
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color={colors.iconPrimary} />
         </TouchableOpacity>
@@ -651,34 +679,34 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
         <View style={styles.headerRight}>
           {currentUser && currentUser.id === list.ownerID && (
             <>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerButton}
                 onPress={handleAddItem}
               >
                 <Icon name="add" size={24} color={colors.iconPrimary} />
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerButton}
                 onPress={() => setIsEditMode(!isEditMode)}
               >
-                <Icon 
-                  name={isEditMode ? "checkmark" : "pencil"} 
-                  size={24} 
-                  color={colors.iconPrimary} 
+                <Icon
+                  name={isEditMode ? "checkmark" : "pencil"}
+                  size={24}
+                  color={colors.iconPrimary}
                 />
               </TouchableOpacity>
             </>
           )}
           {currentUser && (
             currentUser.id === list.ownerID || list.folderID ? (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerButton}
                 onPress={() => setIsSettingsModalVisible(true)}
               >
                 <Icon name="settings-outline" size={24} color={colors.iconPrimary} />
               </TouchableOpacity>
             ) : !list.folderID && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.headerButton}
                 onPress={() => setIsAddToLibraryModalVisible(true)}
               >
@@ -688,156 +716,216 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
           )}
         </View>
       </View>
-      
-      {/* Scrollable content */}
-      <ScrollView style={styles.scrollContent}>
-        {/* List details section */}
-        {!isEditMode && (
-          <View style={[styles.detailsSection, { borderBottomColor: colors.divider }]}>
-            {/* <View style={styles.coverImageContainer}>
-              {list.coverImageURL ? (
-                <Image source={{ uri: list.coverImageURL }} style={styles.coverImage} />
-              ) : (
-                <View style={[styles.coverImagePlaceholder, { backgroundColor: colors.backgroundSecondary }]} />
-              )}
-            </View> */}
-            
-            <View style={styles.listInfo}>
-              <Text style={[styles.listTitle, { color: colors.textPrimary }]}>{list.title}</Text>
-              
-              {/* Owner info with profile link */}
-              {listOwner && (
-                <TouchableOpacity 
-                  style={[styles.ownerContainer, { backgroundColor: colors.backgroundSecondary }]} 
-                  onPress={() => (navigation as any).navigate('User', { userID: listOwner.id })}
-                >
-                  <View style={[styles.ownerAvatarContainer, { backgroundColor: colors.backgroundTertiary }]}>
-                    {listOwner.avatarURL ? (
-                      <Image source={{ uri: listOwner.avatarURL }} style={styles.ownerAvatar} />
-                    ) : (
-                      <Text style={[styles.ownerAvatarText, { color: colors.textTertiary }]}>
-                        {listOwner.username.charAt(0).toUpperCase()}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={[styles.ownerName, { color: colors.textSecondary }]}>
-                    {listOwner.username}
-                  </Text>
-                  <Icon name="chevron-forward" size={16} color={colors.iconSecondary} />
-                </TouchableOpacity>
-              )}
-              
-              {list.description && (
-                <Text style={[styles.listDescription, { color: colors.textSecondary }]}>
-                  {stripHtml(list.description)}
+
+      {/* List details section */}
+      {!isEditMode && (
+        <View style={[styles.detailsSection, { borderBottomColor: colors.divider }]}> 
+          <View style={styles.listInfo}>
+            <Text style={[styles.listTitle, { color: colors.textPrimary }]}>{list.title}</Text>
+            {/* Owner info with profile link */}
+            {listOwner && (
+              <TouchableOpacity
+                style={[styles.ownerContainer, { backgroundColor: colors.backgroundSecondary }]}
+                onPress={() => (navigation as any).navigate('User', { userID: listOwner.id })}
+              >
+                <View style={[styles.ownerAvatarContainer, { backgroundColor: colors.backgroundTertiary }]}> 
+                  {listOwner.avatarURL ? (
+                    <Image source={{ uri: listOwner.avatarURL }} style={styles.ownerAvatar} />
+                  ) : (
+                    <Text style={[styles.ownerAvatarText, { color: colors.textTertiary }]}> 
+                      {listOwner.username.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.ownerName, { color: colors.textSecondary }]}> 
+                  {listOwner.username}
                 </Text>
-              )}
-            </View>
+                <Icon name="chevron-forward" size={16} color={colors.iconSecondary} />
+              </TouchableOpacity>
+            )}
+            {list.description && (
+              <Text style={[styles.listDescription, { color: colors.textSecondary }]}> 
+                {stripHtml(list.description)}
+              </Text>
+            )}
           </View>
-        )}
-        {/* Search items input */}
-        <View style={[styles.searchBar, { backgroundColor: colors.inputBackground, shadowColor: colors.shadow, borderColor: colors.inputBorder, borderWidth: 1 }]}>  
-          <Icon name="search-outline" size={24} color={colors.iconSecondary} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.inputText }]}
-            placeholder="Search items..."
-            placeholderTextColor={colors.inputPlaceholder}
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchTerm.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchTerm('')} style={styles.clearButton}>
-              <Icon name="close-circle-outline" size={20} color={colors.iconSecondary} />
-            </TouchableOpacity>
-          )}
         </View>
-        {/* Sort order chips (edit mode, owner only) */}
-        {isEditMode && currentUser && currentUser.id === list.ownerID && (
-          <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.divider }}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}
-            >
-              {["date-first", "date-last", "alphabetical", "manual"].map((option) => (
-                <TouchableOpacity
-                  key={option}
+      )}
+      {/* Search items input */}
+      <View style={[styles.searchBar, { backgroundColor: colors.inputBackground, shadowColor: colors.shadow, borderColor: colors.inputBorder, borderWidth: 1 }]}> 
+        <Icon name="search-outline" size={24} color={colors.iconSecondary} style={styles.searchIcon} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.inputText }]}
+          placeholder="Search items..."
+          placeholderTextColor={colors.inputPlaceholder}
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          returnKeyType="search"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {searchTerm.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchTerm('')} style={styles.clearButton}>
+            <Icon name="close-circle-outline" size={20} color={colors.iconSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+      {/* Sort order chips (edit mode, owner only) */}
+      {isEditMode && currentUser && currentUser.id === list.ownerID && (
+        <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.divider }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}
+          >
+            {["date-first", "date-last", "alphabetical", "manual"].map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={{
+                  padding: 8,
+                  borderRadius: 8,
+                  marginRight: 8,
+                  backgroundColor: sortOrder === option ? colors.primary : colors.backgroundSecondary,
+                }}
+                onPress={async () => {
+                  setSortOrder(option as SortOrderType);
+                  await handleSettingsSave({ sortOrder: option as SortOrderType });
+                }}
+              >
+                <Text
                   style={{
-                    padding: 8,
-                    borderRadius: 8,
-                    marginRight: 8,
-                    backgroundColor: sortOrder === option ? colors.primary : colors.backgroundSecondary,
-                  }}
-                  onPress={async () => {
-                    setSortOrder(option as SortOrderType);
-                    await handleSettingsSave({ sortOrder: option as SortOrderType });
+                    fontSize: 16,
+                    color: sortOrder === option ? 'white' : colors.textSecondary,
+                    fontWeight: sortOrder === option ? '600' : undefined,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      color: sortOrder === option ? 'white' : colors.textSecondary,
-                      fontWeight: sortOrder === option ? '600' : undefined,
-                    }}
-                  >
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-        {/* Items list */}
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </>
+  );
+
+  // Empty message as footer
+  const renderListFooter = () => (
+    items.length === 0 ? (
+      <Text style={[styles.emptyMessage, { color: colors.textTertiary }]}>No items in this list yet</Text>
+    ) : null
+  );
+
+  // Main render
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+        <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
         ) : (
-          <View style={styles.itemsContainer}>
-            {items.map((item) => (
-              <View key={item.id}>
-                {renderItem({ item })}
-              </View>
-            ))}
-            {items.length === 0 && (
-              <Text style={[styles.emptyMessage, { color: colors.textTertiary }]}>No items in this list yet</Text>
-            )}
-          </View>
+          isEditMode && sortOrder === 'manual' ? (
+            <DraggableFlatList
+              data={items}
+              keyExtractor={item => item.id}
+              onDragEnd={({ data }) => handleManualReorder(data)}
+              activationDistance={10}
+              containerStyle={styles.itemsContainer}
+              renderItem={({ item, drag, isActive }: RenderItemParams<Item>) => (
+                <TouchableOpacity
+                  onPressIn={drag}
+                  style={[
+                    styles.resultItem,
+                    {
+                      backgroundColor: colors.card,
+                      shadowColor: colors.shadow,
+                      opacity: isActive ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  {/* Order index bubble */}
+                  <View style={{
+                    position: 'absolute',
+                    top: -8,
+                    left: -8,
+                    backgroundColor: colors.primary,
+                    borderRadius: 12,
+                    paddingHorizontal: 7,
+                    paddingVertical: 2,
+                    zIndex: 2,
+                    minWidth: 22,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: colors.card,
+                    shadowColor: colors.shadow,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 2,
+                    elevation: 2,
+                  }}>
+                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>{(item.orderIndex ?? 0) + 1}</Text>
+                  </View>
+                  <View style={styles.resultContent}>
+                    <Text
+                      style={[styles.resultDescription, { color: colors.textSecondary }]}
+                      numberOfLines={2}
+                    >
+                      {stripHtml(item.content)}
+                    </Text>
+                  </View>
+                  <Icon name="reorder-three-outline" size={24} color={colors.iconSecondary} />
+                </TouchableOpacity>
+              )}
+              ListHeaderComponent={renderListHeader}
+              ListFooterComponent={renderListFooter}
+            />
+          ) : (
+            <DraggableFlatList
+              data={items}
+              keyExtractor={item => item.id}
+              scrollEnabled={true}
+              onDragEnd={() => {}}
+              activationDistance={10}
+              containerStyle={styles.itemsContainer}
+              renderItem={({ item }: RenderItemParams<Item>) => (
+                <View key={item.id}>{renderItem({ item })}</View>
+              )}
+              ListHeaderComponent={renderListHeader}
+              ListFooterComponent={renderListFooter}
+            />
+          )
         )}
-      </ScrollView>
-
-      {/* Settings Modal */}
-      <ListSettingsModal
-        visible={isSettingsModalVisible}
-        onClose={() => setIsSettingsModalVisible(false)}
-        list={list}
-        onSave={handleSettingsSave}
-        isOwner={list.isOwner(currentUser?.id || '')}
-        onRemoveFromLibrary={handleRemoveFromLibrary}
-        onDeleteList={handleDeleteList}
-      />
-
-      {/* Add to Library Modal */}
-      <AddToLibraryModal
-        visible={isAddToLibraryModalVisible}
-        onClose={() => setIsAddToLibraryModalVisible(false)}
-        onAdd={handleAddToLibrary}
-        folders={userFolders}
-      />
-
-      {/* Parser View */}
-      {isParserModalVisible && (
-        <ParserView
-          visible={isParserModalVisible}
-          onDismiss={() => {
-            setIsParserModalVisible(false);
-            fetchItems(); // Refresh items after parser is closed
-          }}
+        {/* Settings Modal */}
+        <ListSettingsModal
+          visible={isSettingsModalVisible}
+          onClose={() => setIsSettingsModalVisible(false)}
           list={list}
+          onSave={handleSettingsSave}
+          isOwner={list.isOwner(currentUser?.id || '')}
+          onRemoveFromLibrary={handleRemoveFromLibrary}
+          onDeleteList={handleDeleteList}
         />
-      )}
-    </SafeAreaView>
+        {/* Add to Library Modal */}
+        <AddToLibraryModal
+          visible={isAddToLibraryModalVisible}
+          onClose={() => setIsAddToLibraryModalVisible(false)}
+          onAdd={handleAddToLibrary}
+          folders={userFolders}
+        />
+        {/* Parser View */}
+        {isParserModalVisible && (
+          <ParserView
+            visible={isParserModalVisible}
+            onDismiss={() => {
+              setIsParserModalVisible(false);
+              fetchItems(); // Refresh items after parser is closed
+            }}
+            list={list}
+          />
+        )}
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 };
 

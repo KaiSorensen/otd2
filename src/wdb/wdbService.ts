@@ -109,36 +109,63 @@ export async function storeNewList(list: List, adderID: string, folderID: string
 
   // console.log("[storeNewList] inserting library list", list.id);
 
+  // Upsert library list entry to avoid duplicates
   await database.write(async () => {
-    await database.get<wLibraryList>('librarylists').create(raw => {
-      const uuid = safeUUID();
-      if (!uuid) {
-        throw new Error('Failed to generate UUID for library list');
-      }
-      raw.id2 = uuid;
-      raw.owner_id = adderID;
-      raw.list_id = list.id;
-      raw.folder_id = folderID;
-      raw.sort_order = list.sortOrder || 'date-first';
-      raw.today = list.today;
-      raw.current_item = list.currentItem;
-      raw.notify_on_new = list.notifyOnNew;
-      raw.notify_time = list.notifyTime;
-      raw.notify_days = Array.isArray(list.notifyDays) ? (list.notifyDays.join(',') as any) : (list.notifyDays ?? null as any);
-      raw.created_at = new Date();
-      raw.updated_at = new Date();
+    // Check for existing library list record
+    const existingLibLists = await database.get<wLibraryList>('librarylists')
+      .query(
+        Q.where('owner_id', adderID),
+        Q.where('folder_id', folderID),
+        Q.where('list_id', list.id)
+      )
+      .fetch();
 
-      if (!list.currentItem) {
-        initializeTodayItem(list);
-      }
-    });
+    if (existingLibLists.length === 0) {
+      // Create new library list record
+      await database.get<wLibraryList>('librarylists').create(raw => {
+        const uuid = safeUUID();
+        if (!uuid) {
+          throw new Error('Failed to generate UUID for library list');
+        }
+        raw.id2 = uuid;
+        raw.owner_id = adderID;
+        raw.list_id = list.id;
+        raw.folder_id = folderID;
+        raw.sort_order = list.sortOrder || 'date-first';
+        raw.today = list.today;
+        raw.current_item = list.currentItem;
+        raw.notify_on_new = list.notifyOnNew;
+        raw.notify_time = list.notifyTime;
+        raw.notify_days = Array.isArray(list.notifyDays) ? (list.notifyDays.join(',') as any) : (list.notifyDays ?? null as any);
+        raw.created_at = new Date();
+        raw.updated_at = new Date();
+
+        if (!list.currentItem) {
+          initializeTodayItem(list);
+        }
+      });
+    } else {
+      // Update existing library list record
+      await existingLibLists[0].update((raw: wLibraryList) => {
+        raw.sort_order = list.sortOrder || 'date-first';
+        raw.today = list.today;
+        raw.current_item = list.currentItem;
+        raw.notify_on_new = list.notifyOnNew;
+        raw.notify_time = list.notifyTime;
+        raw.notify_days = Array.isArray(list.notifyDays) ? (list.notifyDays.join(',') as any) : (list.notifyDays ?? null as any);
+        raw.updated_at = new Date();
+      });
+    }
   });
   // Sync after list creation
   scheduleSync();
 }
 
 export async function storeNewItem(item: Item) {
-  // console.log('[storeNewItem] Incoming item.id:', item.id);
+  // Find the next orderIndex for this list
+  const existingItems = await database.get<wItem>('items').query(Q.where('list_id', item.listID)).fetch();
+  const maxOrderIndex = existingItems.length > 0 ? Math.max(...existingItems.map(i => i.order_index ?? 0)) : -1;
+  const nextOrderIndex = maxOrderIndex + 1;
 
   await database.write(async () => {
     await database.get<wItem>('items').create(raw => {
@@ -146,7 +173,7 @@ export async function storeNewItem(item: Item) {
       raw.list_id = item.listID;
       raw.content = item.content;
       raw.image_urls = item.imageURLs ?? [];
-      raw.order_index = item.orderIndex ?? 0;
+      raw.order_index = nextOrderIndex;
       raw.created_at = new Date();
       raw.updated_at = new Date();
     });
@@ -343,9 +370,11 @@ export async function populateUserLists(user: User) {
     if (toDelete.length > 0) {
       console.error(`[populateUserLists] Duplicate librarylists found for user: ${user.id}. Count: ${toDelete.length}`);
       console.error(`[populateUserLists] Duplicate IDs:`, toDelete.map(l => l.id2));
-      for (const entry of toDelete) {
-        await entry.markAsDeleted();
-      }
+      await database.write(async () => {
+        for (const entry of toDelete) {
+          await entry.markAsDeleted();
+        }
+      });
       libraryLists = uniqueLibraryLists;
     }
 
@@ -407,9 +436,11 @@ export async function populateFoldersListIDs(folder: Folder) {
   if (toDelete.length > 0) {
     console.error(`[populateFoldersListIDs] Duplicate librarylists found for folder: ${folder.id}. Count: ${toDelete.length}`);
     console.error(`[populateFoldersListIDs] Duplicate IDs:`, toDelete.map(l => l.id2));
-    for (const entry of toDelete) {
-      await entry.markAsDeleted();
-    }
+    await database.write(async () => {
+      for (const entry of toDelete) {
+        await entry.markAsDeleted();
+      }
+    });
     libraryLists = uniqueLibraryLists;
   }
   folder.listsIDs = libraryLists.map((entry) => entry.list_id);
@@ -873,21 +904,42 @@ export async function deleteItem(userID: string, itemId: string): Promise<void> 
     throw new Error('Item not found');
   }
   const list = await retrieveList(item[0].list_id);
+  const deletedOrderIndex = item[0].order_index;
   const shouldRotate = list?.currentItem === itemId;
 
   // Do the deletion in the write block
   await database.write(async () => {
     const id2 = item[0].id2;
     await item[0].markAsDeleted();
+    // Decrement orderIndex for all items with higher orderIndex in the same list
+    const itemsToUpdate = await database.get<wItem>('items')
+      .query(Q.where('list_id', item[0].list_id), Q.where('order_index', Q.gt(deletedOrderIndex)))
+      .fetch();
+    for (const itm of itemsToUpdate) {
+      itm.order_index = itm.order_index - 1;
+      await itm.update(raw => { raw.order_index = itm.order_index; });
+    }
     // Add the id2 to the deleted array in the changes object
     (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
     (database as any).adapter.deletedRecords.items = (database as any).adapter.deletedRecords.items || [];
     (database as any).adapter.deletedRecords.items.push(id2);
   });
 
-  // Now, outside the write block, rotate if needed
-  if (shouldRotate && list) {
-    await rotateTodayItemForList(userID, list, "next");
+  // Now, outside the write block, update currentItem if needed
+  if (list) {
+    // Get all remaining items in order
+    const remainingItems = await database.get<wItem>('items')
+      .query(Q.where('list_id', list.id))
+      .fetch();
+    if (remainingItems.length === 0) {
+      // No items left, set currentItem to null
+      await updateLibraryList(list.ownerID, list.folderID, list.id, { currentItem: null });
+    } else if (shouldRotate) {
+      // Set to the next item in order, or first if deleted was last
+      const sorted = remainingItems.sort((a, b) => a.order_index - b.order_index);
+      const nextItem = sorted.find(i => i.order_index === deletedOrderIndex) || sorted[0];
+      await updateLibraryList(list.ownerID, list.folderID, list.id, { currentItem: nextItem.id2 });
+    }
   }
 
   // Sync after item deletion
@@ -899,6 +951,13 @@ export async function deleteItem(userID: string, itemId: string): Promise<void> 
 
 
 export async function addItems(items: Item[]) {
+  if (items.length === 0) return;
+  // Assume all items are for the same list
+  const listID = items[0].listID;
+  // Find the current max orderIndex for the list
+  const existingItems = await database.get<wItem>('items').query(Q.where('list_id', listID)).fetch();
+  let nextOrderIndex = existingItems.length > 0 ? Math.max(...existingItems.map(i => i.order_index ?? 0)) + 1 : 0;
+
   await database.write(async () => {
     for (const item of items) {
       await database.get<wItem>('items').create(raw => {
@@ -906,10 +965,11 @@ export async function addItems(items: Item[]) {
         raw.list_id = item.listID;
         raw.content = item.content;
         raw.image_urls = item.imageURLs ?? [];
-        raw.order_index = item.orderIndex;
+        raw.order_index = nextOrderIndex;
         raw.created_at = item.createdAt;
         raw.updated_at = item.updatedAt;
       });
+      nextOrderIndex++;
     }
   });
   // Sync after adding items
@@ -978,42 +1038,20 @@ export async function switchFolderOfList(ownerID: string, oldFolderID: string, n
   scheduleSync();
 }
 
-// Used when user drags an item to a new position in the list
-export async function changeItemOrder(itemId: string, newOrderIndex: number) {
+// Used when user drags items to a new position in the list
+export async function changeItemOrder(itemIdsInOrder: string[]) {
   await database.write(async () => {
-    const item = await database.get<wItem>('items').query(Q.where('id2', itemId)).fetch();
-    if (!item || item.length === 0) {
-      throw new Error('Item not found');
-    }
-    const oldOrderIndex = item[0].order_index;
-    item[0].order_index = newOrderIndex;
-    if (oldOrderIndex < newOrderIndex) {
-      // Move items with order_index greater than oldOrderIndex and less than or equal to newOrderIndex up
-      await database.get<wItem>('items').query(
-        Q.where('list_id', item[0].list_id),
-        Q.where('order_index', Q.gt(oldOrderIndex)),
-        Q.where('order_index', Q.lte(newOrderIndex))
-      ).fetch().then(items => {
-        for (const item of items) {
-          item.order_index = item.order_index - 1;
-          updateItem(item.id2, { orderIndex: item.order_index });
-        }
-      });
-    } else {
-      // Move items with order_index less than oldOrderIndex and greater than or equal to newOrderIndex down
-      await database.get<wItem>('items').query(
-        Q.where('list_id', item[0].list_id),
-        Q.where('order_index', Q.lt(oldOrderIndex)),
-        Q.where('order_index', Q.gte(newOrderIndex))
-      ).fetch().then(items => {
-        for (const item of items) {
-          item.order_index = item.order_index + 1;
-          updateItem(item.id2, { orderIndex: item.order_index });
-        }
+    for (let idx = 0; idx < itemIdsInOrder.length; idx++) {
+      const records = await database.get<wItem>('items')
+        .query(Q.where('id2', itemIdsInOrder[idx]))
+        .fetch();
+      if (records.length === 0) continue;
+      await records[0].update(raw => {
+        raw.order_index = idx;
+        raw.updated_at = new Date();
       });
     }
   });
-  // Sync after changing item order
   scheduleSync();
 }
 

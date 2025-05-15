@@ -109,6 +109,7 @@ export async function syncUserData() {
     isSyncing = true;
     await synchronize({
       database,
+      sendCreatedAsUpdated: true,
       pullChanges: async ({ lastPulledAt, schemaVersion, migration }) => {
         // // // console.log("Pulling changes");
         const changes: any = {};
