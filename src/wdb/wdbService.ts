@@ -281,8 +281,8 @@ export async function retrieveItem(itemId: string): Promise<Item | null> {
         data[0].content,
         data[0].image_urls,
         data[0].order_index,
-        data[0].created_at,
-        data[0].updated_at
+        data[0].created_at instanceof Date ? data[0].created_at : new Date(data[0].created_at),
+        data[0].updated_at instanceof Date ? data[0].updated_at : new Date(data[0].updated_at)
       );
 
       return item;
@@ -568,8 +568,8 @@ export async function getLibraryItemsBySubstring(user: User, substring: string):
         item.content,
         item.image_urls,
         item.order_index,
-        item.created_at,
-        item.updated_at
+        item.created_at instanceof Date ? item.created_at : new Date(item.created_at),
+        item.updated_at instanceof Date ? item.updated_at : new Date(item.updated_at)
       );
     }));
   }
@@ -916,8 +916,7 @@ export async function deleteItem(userID: string, itemId: string): Promise<void> 
       .query(Q.where('list_id', item[0].list_id), Q.where('order_index', Q.gt(deletedOrderIndex)))
       .fetch();
     for (const itm of itemsToUpdate) {
-      itm.order_index = itm.order_index - 1;
-      await itm.update(raw => { raw.order_index = itm.order_index; });
+      await itm.update(raw => { raw.order_index = itm.order_index - 1; });
     }
     // Add the id2 to the deleted array in the changes object
     (database as any).adapter.deletedRecords = (database as any).adapter.deletedRecords || {};
@@ -990,8 +989,8 @@ export async function getItemsInList(list: List): Promise<Item[]> {
       item.content,
       item.image_urls,
       item.order_index,
-      item.created_at,
-      item.updated_at
+      item.created_at instanceof Date ? item.created_at : new Date(item.created_at),
+      item.updated_at instanceof Date ? item.updated_at : new Date(item.updated_at)
     );
   });
 

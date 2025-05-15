@@ -483,12 +483,15 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     if (!currentUser || currentUser.id !== list.ownerID) return;
     try {
       await deleteItem(currentUser.id, item.id);
-      const afterDelete = masterItems.filter(i => i.id !== item.id);
+      // Remove the item and update orderIndex for all remaining
+      const afterDelete = masterItems.filter(i => i.id !== item.id).map((i, idx) => { i.orderIndex = idx; return i; });
       setMasterItems(afterDelete);
       let filtered = afterDelete;
       if (searchTerm.trim().length > 0) {
         filtered = afterDelete.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
       }
+      // Also update orderIndex in filtered list
+      filtered = filtered.map((i, idx) => { i.orderIndex = idx; return i; });
       setItems(sortItems(filtered, sortOrder));
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -600,12 +603,13 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
             canEdit: !!(currentUser && currentUser.id === list.ownerID),
             onItemDone: (result: { item: Item, deleted: boolean }) => {
               if (result.deleted) {
-                const afterDelete = masterItems.filter(i => i.id !== item.id);
+                const afterDelete = masterItems.filter(i => i.id !== item.id).map((i, idx) => { i.orderIndex = idx; return i; });
                 setMasterItems(afterDelete);
                 let filtered = afterDelete;
                 if (searchTerm.trim().length > 0) {
                   filtered = afterDelete.filter(i => i.content.toLowerCase().includes(searchTerm.trim().toLowerCase()));
                 }
+                filtered = filtered.map((i, idx) => { i.orderIndex = idx; return i; });
                 setItems(sortItems(filtered, sortOrder));
               } else {
                 setMasterItems(prev => prev.map(i => i.id === item.id ? result.item : i));
@@ -830,6 +834,9 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               keyExtractor={item => item.id}
               onDragEnd={({ data }) => handleManualReorder(data)}
               activationDistance={10}
+              scrollEnabled={true}
+              autoscrollThreshold={60}
+              autoscrollSpeed={50}
               containerStyle={styles.itemsContainer}
               renderItem={({ item, drag, isActive }: RenderItemParams<Item>) => (
                 <TouchableOpacity
