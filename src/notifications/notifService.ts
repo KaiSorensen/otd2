@@ -21,7 +21,7 @@ export async function initNotifications() {
  * @param intervalDays Days between notifications (default 1)
  */
 export async function scheduleBatchNotificationsForList(list: List, count: number) {
-  console.log('Scheduling batch notifications for list', list.title, count);
+  // console.log('Scheduling batch notifications for list', list.title, count);
   const items = await (await import('../wdb/wdbService')).getItemsInList(list);
   if (!items.length) return;
 
@@ -66,7 +66,7 @@ export async function scheduleBatchNotificationsForList(list: List, count: numbe
       type: TriggerType.TIMESTAMP,
       timestamp: fireDate.getTime(),
     };
-    console.log('Scheduling notification for', item.content, fireDate);
+    // console.log('Scheduling notification for', item.content, fireDate);
     await notifee.createTriggerNotification(
       {
         id: notificationId,

@@ -1,4 +1,4 @@
-package com.otd2
+package com.oftheday
 
 import android.app.Application
 import com.facebook.react.PackageList
