@@ -1,4 +1,4 @@
-import { retrieveList, updateList, retrieveItem, updateLibraryList, rotateTodayItemForList, initializeTodayItem } from '../wdb/wdbService';
+import { retrieveList, updateList, retrieveItem, updateLibraryList, rotateTodayItemForList, initializeTodayItem, storeNewItem, deleteItem, getItemsInList, addItems, changeItemOrder } from '../wdb/wdbService';
 import { Item } from './Item';
 
 export type SortOrder = "date-first" | "date-last" | "alphabetical" | "manual";
@@ -173,5 +173,28 @@ export class List {
             this._notifyDays = data.notifyDays;
             this._orderIndex = data.orderIndex;
         }
+    }
+
+    // ==============================
+    // ======= ITEM FUNCTIONS =======
+    // ==============================
+
+    public addItem(item: Item) {
+        storeNewItem(item);
+    }
+    public removeItem(item: Item) {
+        deleteItem(this._ownerID, item.id);
+    }
+
+    public async addItems(items: Item[]) {
+        await addItems(items);
+    }
+
+    public async getItemsInList(): Promise<Item[]> {
+        return await getItemsInList(this);
+    }
+
+    public async changeItemOrder(itemIDs: string[]) {
+        await changeItemOrder(itemIDs);
     }
 }

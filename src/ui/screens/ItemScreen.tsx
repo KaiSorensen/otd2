@@ -15,13 +15,12 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { WebView } from 'react-native-webview';
+import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { useColors } from '../../contexts/ColorContext';
-import { storeNewItem } from '../../wdb/wdbService';
-import { retrieveItem } from '../../wdb/wdbService';
-import { deleteItem } from '../../wdb/wdbService';
 
 interface ItemScreenProps {
+  list: List;
   item: Item;
   isNew?: boolean;
   onItemDone?: (result: { item: Item, deleted: boolean }) => void;
@@ -30,7 +29,7 @@ interface ItemScreenProps {
   onItemUpdate?: (item: Item) => void;
 }
 
-const ItemScreen: React.FC<ItemScreenProps> = ({ item, isNew = false, onItemDone, onBack, canEdit = false, onItemUpdate }) => {
+const ItemScreen: React.FC<ItemScreenProps> = ({ list, item, isNew = false, onItemDone, onBack, canEdit = false, onItemUpdate }) => {
   const { colors, isDarkMode } = useColors();
   const [content, setContent] = useState<string>(item.content || '');
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -83,13 +82,13 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, isNew = false, onItemDone
     const trimmed = content.trim();
     if (trimmed.length === 0) {
       // Only delete if the item is actually empty
-      await deleteItem(item.listID, item.id);
+      await list.removeItem(item);
       if (onItemDone) onItemDone({ item, deleted: true });
     } else {
       item.content = content;
       // Always save if not empty
       if (isNew) {
-        await storeNewItem(item);
+        await list.addItem(item);
       } else {
         await item.save();
       }
@@ -106,13 +105,13 @@ const ItemScreen: React.FC<ItemScreenProps> = ({ item, isNew = false, onItemDone
       const trimmed = content.trim();
       if (trimmed.length === 0) {
         // Only delete if the item is actually empty
-        await deleteItem(item.listID, item.id);
+        await list.removeItem(item);
         if (onItemDone) onItemDone({ item, deleted: true });
       } else {
         item.content = content;
         // Always save if not empty
         if (isNew) {
-          await storeNewItem(item);
+          await list.addItem(item);
         } else {
           await item.save();
         }

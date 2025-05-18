@@ -195,7 +195,6 @@ export async function retrieveFolder(folderId: string, ownerID: string): Promise
       if (!data || data.length === 0) {
         return null;
       }
-
       const folder = new Folder(
         data[0].id2,
         data[0].owner_id,

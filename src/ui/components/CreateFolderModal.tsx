@@ -13,7 +13,6 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { useColors } from '../../contexts/ColorContext';
 import { Folder } from '../../classes/Folder';
 import { v4 as uuidv4 } from 'uuid';
-import { storeNewFolder } from '../../wdb/wdbService';
 import { useAuth } from '../../contexts/UserContext';
 
 interface CreateFolderModalProps {
@@ -46,7 +45,6 @@ const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
     );
 
     try {
-      await storeNewFolder(newFolder);
       onFolderCreated(newFolder);
       onClose();
       // Reset form

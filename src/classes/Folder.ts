@@ -80,7 +80,7 @@ export class Folder {
     // Method to refresh data from the database
     async refresh(): Promise<void> {
         // Pass empty string as second parameter to match function signature
-        const data = await retrieveFolder(this._id, "");
+        const data = await retrieveFolder(this._id, this._ownerID);
         if (!data) {
             throw new Error("Folder not found");
         }
@@ -90,11 +90,21 @@ export class Folder {
 
     public addList(list: List) {
         this._listsIDs.push(list.id);
+        this.save();
     }
     public removeList(list: List) {
         this._listsIDs = this._listsIDs.filter(id => id !== list.id);
+        this.save();
     }
-
+    public addSubFolder(subFolder: Folder) {
+        this._subFolders.push(subFolder);
+        this.save();
+    }
+    public removeSubFolder(subFolder: Folder) {
+        this._subFolders = this._subFolders.filter(f => f.id !== subFolder.id);
+        this.save();
+    }
+    
     public isEmpty(): boolean {
         return this._listsIDs.length === 0 && this._subFolders.length === 0;
     }

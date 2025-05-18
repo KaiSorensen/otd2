@@ -15,7 +15,6 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { List, DayOfWeek } from '../../classes/List';
 import { useColors } from '../../contexts/ColorContext';
 import { useAuth } from '../../contexts/UserContext';
-import { deleteList } from '../../wdb/wdbService';
 import { Folder } from '../../classes/Folder';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { scheduleBatchNotificationsForList, cancelNotificationsForList } from '../../notifications/notifService';
@@ -248,8 +247,7 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
     if (!list || !currentUser) return;
 
     try {
-      await deleteList(list.id);
-      currentUser.removeList(list);
+      await currentUser.removeList(list);
       onRemoveFromLibrary();
       onClose();
     } catch (error) {
@@ -262,8 +260,7 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
     if (!list || !currentUser) return;
 
     try {
-      await deleteList(list.id);
-      currentUser.removeList(list);
+      await currentUser.removeList(list);
       onDeleteList();
       onClose();
     } catch (error) {
@@ -373,7 +370,7 @@ const ListSettingsModal: React.FC<ListSettingsModalProps> = ({
                 isOpen={isFolderDropdownOpen}
                 toggleOpen={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
                 colors={colors}
-                folders={currentUser?.getAllFolders() || []}
+                folders={currentUser?.getAllFoldersFlat() || []}
               />
             </View>
 

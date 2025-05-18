@@ -19,7 +19,6 @@ import { List } from '../../classes/List';
 import { Item } from '../../classes/Item';
 import { User } from '../../classes/User';
 import { Folder } from '../../classes/Folder';
-import { addItems, storeNewItem, deleteItem, storeNewList, deleteList, getItemsInList as local_getItemsInList, changeItemOrder } from '../../wdb/wdbService';
 import { getItemsInList as remote_getItemsInList, retrieveUser } from '../../supabase/databaseService';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAuth } from '../../contexts/UserContext';
@@ -314,7 +313,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     try {
       let listItems: Item[] = [];
       if (list.folderID) {
-        listItems = await local_getItemsInList(list);
+        listItems = await list.getItemsInList();
       } else {
         listItems = await remote_getItemsInList(list.id);
       }
@@ -343,7 +342,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     setLoadingFolders(true);
     try {
       // First get the populated user to ensure we have the latest folder data
-      setUserFolders(currentUser.getAllFolders());
+      setUserFolders(currentUser.getAllFoldersFlat());
     } catch (error) {
       console.error('Error fetching user folders:', error);
     } finally {
@@ -370,7 +369,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
       }
       persistOrderTimeout.current = setTimeout(async () => {
         try {
-          await changeItemOrder(newOrder.map(item => item.id));
+          await list.changeItemOrder(newOrder.map(item => item.id));
         } catch (err) {
           console.error('Persist reorder failed:', err);
           // rollback: re-fetch from DB
@@ -398,7 +397,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
         await list.save(currentUser.id);
       }
       // Refresh the User to update the library UI
-      await currentUser?.refresh();
+      await currentUser?.refreshPopulatedLibrary();
       //force UI update
       await forceUserUpdate();
     } catch (error) {
@@ -434,7 +433,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               new Date(),
               new Date()
             );
-            await storeNewItem(newItem);
+            await currentUser.addItem(newItem);
             const updated = [...masterItems, newItem];
             setMasterItems(updated);
             // update items view as well
@@ -482,7 +481,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
   const handleDeleteItem = async (item: Item) => {
     if (!currentUser || currentUser.id !== list.ownerID) return;
     try {
-      await deleteItem(currentUser.id, item.id);
+      await currentUser.removeItem(item);
       // Remove the item and update orderIndex for all remaining
       const afterDelete = masterItems.filter(i => i.id !== item.id).map((i, idx) => { i.orderIndex = idx; return i; });
       setMasterItems(afterDelete);
@@ -504,13 +503,13 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
     if (!currentUser) return;
 
     try {
-      await storeNewList(list, currentUser.id, folderId);
+      await currentUser.addList(list);
       if (currentUser.id !== list.ownerID) {
-        await addItems(items); // if it's not in our library AND the user is not the owner, then we need to download the items
+        await list.addItems(items); // if it's not in our library AND the user is not the owner, then we need to download the items
         // // console.log("added remote items to library")
       }
       // Refresh the User to update the library UI
-      await currentUser.refresh();
+      await currentUser.refreshPopulatedLibrary();
       //force UI update
       await forceUserUpdate();
       // Update the local list state to reflect it's now in the library
@@ -544,7 +543,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               // First remove from memory
               currentUser.removeList(list);
               // Then delete from database
-              await deleteList(list.id);
+              await currentUser.removeList(list);
               // Update the local list state to reflect it's no longer in the library
               setList(initialList);
               // Finally refresh user state
@@ -577,7 +576,7 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteList(list.id);
+              await currentUser.removeList(list);
               if (onBack) onBack();
             } catch (error) {
               console.error('Error deleting list:', error);

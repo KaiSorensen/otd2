@@ -22,7 +22,7 @@ export async function initNotifications() {
  */
 export async function scheduleBatchNotificationsForList(list: List, count: number) {
   // console.log('Scheduling batch notifications for list', list.title, count);
-  const items = await (await import('../wdb/wdbService')).getItemsInList(list);
+  const items = await list.getItemsInList();
   if (!items.length) return;
 
   // Find the current item index

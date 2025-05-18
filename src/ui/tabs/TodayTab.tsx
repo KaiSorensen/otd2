@@ -19,7 +19,7 @@ import ListScreen from '../screens/ListScreen';
 import ItemScreen from '../screens/ItemScreen';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { rotateTodayItemForList, retrieveItem, getItemsInList } from '../../wdb/wdbService';
+
 
 const TodayScreen = () => {
   const { currentUser, loading, forceUserUpdate } = useAuth();
@@ -110,11 +110,11 @@ const TodayScreen = () => {
         // For each list, check if currentItem exists
         for (const list of lists) {
           if (!list.currentItem) continue;
-          const items = await getItemsInList(list);
+          const items = await list.getItemsInList();
           const current = items.find(i => i.id === list.currentItem);
           if (!current) {
             // If currentItem was deleted, rotate
-            await rotateTodayItemForList(currentUser.id, list, 'next');
+            await list.rotateTodayItem(currentUser.id, 'next');
             await info.refreshTodayItems();
           }
         }

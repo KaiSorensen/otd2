@@ -13,7 +13,6 @@ import {
   TextInputSelectionChangeEventData,
   SafeAreaView,
 } from "react-native";
-import { addItems } from "../../wdb/wdbService";
 import { List } from "../../classes/List";
 import { Item } from "../../classes/Item";
 import { v4 as uuidv4 } from "uuid";
@@ -256,7 +255,7 @@ const ParserView: React.FC<ParserViewProps> = ({ visible, onDismiss, list }) => 
 
   const persist = async () => {
     const items = makeItems().filter((i) => i.content);
-    if (items.length) await addItems(items);
+    if (items.length) await list.addItems(items);
     onDismiss();
   };
 

@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!currentUser) return;
     
     // First refresh the current user data
-    await currentUser.refresh();
+    await currentUser.refreshAll();
     
     // Create a new user object with the refreshed data
     const updatedUser = new User(

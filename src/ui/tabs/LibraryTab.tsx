@@ -18,10 +18,8 @@ import { Folder } from '../../classes/Folder';
 import { List } from '../../classes/List';
 import Icon from 'react-native-vector-icons/Ionicons';
 import UserSettingsScreen from '../screens/UserSettingsScreen';
-import ListScreen from '../screens/ListScreen';
 import CreateFolderModal from '../components/CreateFolderModal';
 import CreateListModal from '../components/CreateListModal';
-import { deleteFolder } from '../../wdb/wdbService';
 import { useRoute, useNavigation } from '@react-navigation/native';
 
 const LibraryScreen = () => {
@@ -32,7 +30,6 @@ const LibraryScreen = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCreateList, setShowCreateList] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
   const route = useRoute();
   const navigation = useNavigation();
 
@@ -50,8 +47,6 @@ const LibraryScreen = () => {
       };
       addFolderIds(currentUser.rootFolders);
       setExpandedFolders(newExpandedFolders);
-      // Force a re-render when currentUser changes
-      setForceUpdate(prev => prev + 1);
     }
   }, [currentUser]);
 
@@ -60,7 +55,7 @@ const LibraryScreen = () => {
     // @ts-ignore
     const { listId, itemId, fromNotification } = route.params || {};
     if (fromNotification && listId) {
-      const list = currentUser?.getList(listId);
+      const list = currentUser?.getListObject(listId);
       if (list) {
         (navigation as any).navigate('List', { list, initialItemId: itemId });
       }
@@ -146,7 +141,6 @@ const LibraryScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteFolder(folder.id);
               if (currentUser) {
                 currentUser.removeFolder(folder);
                 const newExpandedFolders = new Set(expandedFolders);
@@ -204,7 +198,7 @@ const LibraryScreen = () => {
             )}
 
             {folder.listsIDs.map(listId => {
-              const list = currentUser?.getList(listId);
+              const list = currentUser?.getListObject(listId);
               if (list) {
                 return <React.Fragment key={listId}>{renderListItem(list, paddingLeft + 20)}</React.Fragment>;
               }
@@ -214,10 +208,6 @@ const LibraryScreen = () => {
         )}
       </View>
     );
-  };
-
-  const handleBackFromListScreen = () => {
-    // This function is no longer used
   };
 
   const handleFolderCreated = (folder: Folder) => {
@@ -323,14 +313,14 @@ const LibraryScreen = () => {
         visible={showCreateFolder}
         onClose={() => setShowCreateFolder(false)}
         onFolderCreated={handleFolderCreated}
-        parentFolders={currentUser?.getAllFolders() || []}
+        parentFolders={currentUser?.getAllFoldersFlat() || []}
       />
 
       <CreateListModal
         visible={showCreateList}
         onClose={() => setShowCreateList(false)}
         onListCreated={handleListCreated}
-        folders={currentUser?.getAllFolders() || []}
+        folders={currentUser?.getAllFoldersFlat() || []}
       />
     </SafeAreaView>
   );
