@@ -96,7 +96,33 @@ const fieldNameMap: { [key: string]: { [key: string]: string } } = {
 // Module-level d lock
 let isSyncing = false;
 
+async function waitForSession(): Promise<any> {
+  let { data: { session } } = await supabase.auth.getSession();
+  if (session && session.user) return session;
+
+  // Listen for session creation
+  return new Promise((resolve) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && session.user) {
+        listener.subscription.unsubscribe();
+        resolve(session);
+      }
+    });
+  });
+}
+
+// Utility to normalize date fields from Supabase
+function normalizeDate(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export async function syncUserData() {
+  // Wait for session before proceeding
+  await waitForSession();
+
   // If already syncing, skip this sync
   if (isSyncing) {
     // // console.log('Sync already in progress, skipping...');
@@ -111,7 +137,7 @@ export async function syncUserData() {
       database,
       sendCreatedAsUpdated: true,
       pullChanges: async ({ lastPulledAt, schemaVersion, migration }) => {
-        // // // console.log("Pulling changes");
+        console.log('[pullChanges] Start', { lastPulledAt, schemaVersion, migration });
         const changes: any = {};
         const timestamp = Date.now();
 
@@ -120,16 +146,17 @@ export async function syncUserData() {
           let query = supabase
             .from(supabaseTable.toLowerCase())
             .select('*')
-            .gt('updatedat', new Date(lastPulledAt || 0).toISOString());
+          console.log(`[pullChanges][${watermelonTable}] Querying for records updated after`, new Date(lastPulledAt || 0).toISOString());
 
           // Only pull the current user's data for users table
           if (watermelonTable === 'users') {
             const { data: { session } } = await supabase.auth.getSession();
+            console.log(`[pullChanges][users] session.user.id:`, session?.user?.id);
             if (session?.user?.id) {
-              // // // console.log("user sessoin id: ", session.user.id)
               query = query.eq('id', session.user.id);
+              console.log(`[pullChanges][users] Filtering for user id:`, session.user.id);
             } else {
-              // If no session, skip users table entirely
+              console.log('[pullChanges][users] No session, skipping users table');
               continue;
             }
           }
@@ -137,10 +164,12 @@ export async function syncUserData() {
           // For folders table, only pull folders owned by the current user
           if (watermelonTable === 'folders') {
             const { data: { session } } = await supabase.auth.getSession();
+            console.log(`[pullChanges][folders] session.user.id:`, session?.user?.id);
             if (session?.user?.id) {
               query = query.eq('ownerid', session.user.id);
+              console.log(`[pullChanges][folders] Filtering for ownerid:`, session.user.id);
             } else {
-              // If no session, skip folders table entirely
+              console.log('[pullChanges][folders] No session, skipping folders table');
               continue;
             }
           }
@@ -148,22 +177,23 @@ export async function syncUserData() {
           // For lists table, only pull lists that are in the user's library
           if (watermelonTable === 'lists') {
             const { data: { session } } = await supabase.auth.getSession();
+            console.log(`[pullChanges][lists] session.user.id:`, session?.user?.id);
             if (session?.user?.id) {
-              // Get all list_ids from librarylists for this user
               const { data: libraryLists } = await supabase
                 .from('librarylists')
                 .select('list_id')
                 .eq('ownerid', session.user.id);
-              
+              console.log(`[pullChanges][lists] libraryLists:`, libraryLists);
               if (libraryLists && libraryLists.length > 0) {
                 const listIds = libraryLists.map(lib => lib.list_id);
+                console.log(`[pullChanges][lists] Filtering for list ids:`, listIds);
                 query = query.in('id', listIds);
               } else {
-                // If no library lists, skip lists table entirely
+                console.log('[pullChanges][lists] No library lists, skipping lists table');
                 continue;
               }
             } else {
-              // If no session, skip lists table entirely
+              console.log('[pullChanges][lists] No session, skipping lists table');
               continue;
             }
           }
@@ -171,11 +201,12 @@ export async function syncUserData() {
           // For librarylists table, pull entries stored under the user's id as the ownerid
           if (watermelonTable === 'librarylists') {
             const { data: { session } } = await supabase.auth.getSession();
+            console.log(`[pullChanges][librarylists] session.user.id:`, session?.user?.id);
             if (session?.user?.id) {
-              // // // console.log("user sessoin id: ", session.user.id)
               query = query.eq('ownerid', session.user.id);
+              console.log(`[pullChanges][librarylists] Filtering for ownerid:`, session.user.id);
             } else {
-              // // // console.log("no session, skipping librarylists table");
+              console.log('[pullChanges][librarylists] No session, skipping librarylists table');
               continue;
             }
           }
@@ -183,28 +214,30 @@ export async function syncUserData() {
           // For items table, only pull items that belong to lists in the user's library
           if (watermelonTable === 'items') {
             const { data: { session } } = await supabase.auth.getSession();
+            console.log(`[pullChanges][items] session.user.id:`, session?.user?.id);
             if (session?.user?.id) {
-              // Get all list_ids from librarylists for this user
               const { data: libraryLists } = await supabase
                 .from('librarylists')
                 .select('list_id')
                 .eq('ownerid', session.user.id);
-              
+              console.log(`[pullChanges][items] libraryLists:`, libraryLists);
               if (libraryLists && libraryLists.length > 0) {
                 const listIds = libraryLists.map(lib => lib.list_id);
+                console.log(`[pullChanges][items] Filtering for listids:`, listIds);
                 query = query.in('listid', listIds);
               } else {
-                // If no library lists, skip items table entirely
+                console.log('[pullChanges][items] No library lists, skipping items table');
                 continue;
               }
             } else {
-              // If no session, skip items table entirely
+              console.log('[pullChanges][items] No session, skipping items table');
               continue;
             }
           }
           
 
           const { data, error } = await query;
+          console.log(`[pullChanges][${watermelonTable}] Query:`, query, 'Result:', data, 'Error:', error);
 
           if (error) throw error;
 
@@ -221,27 +254,23 @@ export async function syncUserData() {
           // Transform Supabase data to Watermelon format
           data?.forEach(record => {
             const transformedRecord: any = {};
-            // Add the id field that WatermelonDB requires
             transformedRecord.id = record.id;
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
               let value = record[supabaseField];
-              // Convert date fields to Date objects
               if (["created_at", "updated_at", "notify_time", "date_last_rotated_today_lists"].includes(watermelonField)) {
-                value = value ? new Date(value) : null;
+                value = normalizeDate(value);
               }
               transformedRecord[watermelonField] = value;
+              if (watermelonField === 'id2' || watermelonField === 'id') {
+                console.log(`[pullChanges][${watermelonTable}] Mapping id:`, record[supabaseField], '->', value);
+              }
             });
-            // // // console.log(`[syncService] Transformed record for ${watermelonTable}:`, transformedRecord);
-            // If the record was created after lastPulledAt, it's a new record
-            if (new Date(record.createdat) > new Date(lastPulledAt || 0)) {
-              changes[watermelonTable].created.push(transformedRecord);
-            } else {
-              changes[watermelonTable].updated.push(transformedRecord);
-            }
+            console.log(`[pullChanges][${watermelonTable}] Transformed record:`, transformedRecord);
+            changes[watermelonTable].updated.push(transformedRecord);
           });
         }
 
-        // // // console.log('[syncService] All pulled and transformed changes:', changes);
+        console.log('[pullChanges] All pulled and transformed changes:', changes);
 
         // Cleanup duplicates after pulling changes
         // await cleanupDuplicateLibraryLists();
@@ -252,10 +281,10 @@ export async function syncUserData() {
         };
       },
       pushChanges: async ({ changes, lastPulledAt }: PushChanges) => {
-        // // // console.log("Pushing changes");
-        // For each table with changes, push to Supabase
+        console.log('[pushChanges] Start', { changes, lastPulledAt });
         for (const [watermelonTable, tableChanges] of Object.entries(changes)) {
           const supabaseTable = tableNameMap[watermelonTable];
+          console.log(`[pushChanges][${watermelonTable}] Processing table. Created:`, tableChanges.created.length, 'Updated:', tableChanges.updated.length, 'Deleted:', tableChanges.deleted.length);
           
           // // Skip user deletions entirely
           // if (watermelonTable === 'users' && tableChanges.deleted.length > 0) {
@@ -271,32 +300,38 @@ export async function syncUserData() {
             const transformedRecord: any = {};
             Object.entries(fieldNameMap[watermelonTable]).forEach(([watermelonField, supabaseField]) => {
               let value = record[watermelonField];
-              // Fix for image_urls/imageurls: always send an array
               if (watermelonTable === 'items' && (watermelonField === 'image_urls' || watermelonField === 'imageurls')) {
                 if (!Array.isArray(value)) value = [];
               }
-              // Convert date fields to ISO strings
               if (["created_at", "updated_at", "notify_time", "date_last_rotated_today_lists"].includes(watermelonField)) {
-                value = value ? new Date(value).toISOString() : null;
+                if (!value && watermelonField === "created_at") {
+                  value = new Date().toISOString(); // fallback to now if missing
+                } else {
+                  value = value ? new Date(value).toISOString() : null;
+                }
               }
-              // // Ensure sortorder has a valid value for librarylists
-              // if (watermelonTable === 'librarylists' && watermelonField === 'sort_order') {
-              //   const validSortOrders = ['date-first', 'date-last', 'alphabetical', 'manual'];
-              //   if (!value || !validSortOrders.includes(value)) {
-              //     value = 'date-first'; // Default to date-first if invalid or missing
-              //   }
-              // }
               transformedRecord[supabaseField] = value;
+              if (watermelonField === 'id2' || watermelonField === 'id') {
+                console.log(`[pushChanges][${watermelonTable}] Upserting id:`, value);
+              }
             });
-            // // // console.log(`[syncService] Prepared record to upsert for ${supabaseTable}:`, transformedRecord);
+            console.log(`[pushChanges][${watermelonTable}] Prepared record to upsert:`, transformedRecord);
             return transformedRecord;
           });
+
+          if (watermelonTable === 'folders' || watermelonTable === 'librarylists') {
+            console.log(`[pushChanges][${watermelonTable}] recordsToUpsert:`, recordsToUpsert);
+          }
 
           // Filter out lists that don't belong to the current user
           if (watermelonTable === 'lists') {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.id) {
-              recordsToUpsert = recordsToUpsert.filter(record => record.ownerid === session.user.id);
+              recordsToUpsert = recordsToUpsert.filter(record => {
+                const isOwner = record.ownerid === session.user.id;
+                console.log(`[pushChanges][lists] Filtering upsert for ownerid:`, record.ownerid, '==', session.user.id, '?', isOwner);
+                return isOwner;
+              });
             }
           }
 
@@ -304,7 +339,6 @@ export async function syncUserData() {
           if (watermelonTable === 'items') {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.id) {
-              // Get all lists owned by the current user
               const { data: userLists } = await supabase
                 .from('lists')
                 .select('id')
@@ -312,7 +346,11 @@ export async function syncUserData() {
               
               if (userLists) {
                 const userListIds = userLists.map(list => list.id);
-                recordsToUpsert = recordsToUpsert.filter(record => userListIds.includes(record.listid));
+                recordsToUpsert = recordsToUpsert.filter(record => {
+                  const belongsToUserList = userListIds.includes(record.listid);
+                  console.log(`[pushChanges][items] Filtering upsert for listid:`, record.listid, 'in', userListIds, '?', belongsToUserList);
+                  return belongsToUserList;
+                });
               }
             }
           }
@@ -320,25 +358,27 @@ export async function syncUserData() {
           // // // console.log(`[syncService] All records to upsert for ${supabaseTable}:`, recordsToUpsert);
 
           if (recordsToUpsert.length > 0) {
+            console.log(`[pushChanges][${watermelonTable}] Upserting records:`, recordsToUpsert.map(r => r.id || r.id2));
             const { error } = await supabase
               .from(supabaseTable)
               .upsert(recordsToUpsert);
 
-            if (error) throw error;
+            if (error) {
+              console.error(`[pushChanges][${watermelonTable}] upsert error:`, error);
+              throw error;
+            }
           }
 
           // Handle deleted records
           if (tableChanges.deleted.length > 0) {
-            // // // console.log(`[syncService] Deleting records from ${supabaseTable}:`, tableChanges.deleted);
-            
-            // Get the stored id2 values for the deleted records
+            console.log(`[pushChanges][${watermelonTable}] Handling deletions:`, tableChanges.deleted);
             let storedDeletions: string[] = (database as any).adapter.deletedRecords?.[watermelonTable] || [];
-            // // // console.log(`[syncService] Stored deletions for ${watermelonTable}:`, storedDeletions);
+            console.log(`[pushChanges][${watermelonTable}] Stored deletions:`, storedDeletions);
             
             if (storedDeletions.length > 0) {
               // Skip user deletions entirely
               if (watermelonTable === 'users') {
-                // // // console.log('[syncService] Skipping user deletions for security');
+                console.log('[pushChanges][users] Skipping user deletions for security');
                 return;
               }
 
@@ -354,7 +394,11 @@ export async function syncUserData() {
                   
                   if (userLists) {
                     const userListIds = userLists.map(list => list.id);
-                    storedDeletions = storedDeletions.filter(id => userListIds.includes(id));
+                    storedDeletions = storedDeletions.filter(id => {
+                      const isUserList = userListIds.includes(id);
+                      console.log(`[pushChanges][lists] Deletion id:`, id, 'is user list?', isUserList);
+                      return isUserList;
+                    });
                   } else {
                     storedDeletions = [];
                   }
@@ -384,7 +428,11 @@ export async function syncUserData() {
                     
                     if (userItems) {
                       const userItemIds = userItems.map(item => item.id);
-                      storedDeletions = storedDeletions.filter(id => userItemIds.includes(id));
+                      storedDeletions = storedDeletions.filter(id => {
+                        const isUserItem = userItemIds.includes(id);
+                        console.log(`[pushChanges][items] Deletion id:`, id, 'is user item?', isUserItem);
+                        return isUserItem;
+                      });
                     } else {
                       storedDeletions = [];
                     }
@@ -397,22 +445,26 @@ export async function syncUserData() {
               }
 
               if (storedDeletions.length > 0) {
+                console.log(`[pushChanges][${watermelonTable}] Deleting records with ids:`, storedDeletions);
                 const { error } = await supabase
                   .from(supabaseTable)
                   .delete()
                   .in('id', storedDeletions);
 
-                if (error) throw error;
+                if (error) {
+                  console.error(`[pushChanges][${watermelonTable}] delete error:`, error);
+                  throw error;
+                }
                 
                 // Clear the stored deletions after successful sync
                 (database as any).adapter.deletedRecords[watermelonTable] = [];
+              } else {
+                console.log(`[pushChanges][${watermelonTable}] No deletions to process after filtering.`);
               }
             }
           }
         }
-
-        // Cleanup duplicates after pushing changes
-        // await cleanupDuplicateLibraryLists();
+        console.log('[pushChanges] Finished all tables.');
       },
       migrationsEnabledAtVersion: 1,
       log: logger,
@@ -524,3 +576,13 @@ export async function syncUserData() {
 //     // // console.log('[cleanupDuplicateLibraryLists] No duplicates found.');
 //   }
 // } 
+
+// Call this once at app startup
+export function setupAuthSyncTrigger() {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) {
+      // Session created, trigger a pull
+      iWantToSync();
+    }
+  });
+} 

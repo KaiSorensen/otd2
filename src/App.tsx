@@ -1,5 +1,3 @@
-import 'react-native-gesture-handler'; // 👈 must come first
-import 'react-native-reanimated'; // 👈 recommended second
 import '../shim';
 import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
@@ -77,7 +75,7 @@ const AppContent = () => {
                           params: { fromNotification: true, listId, itemId },
                           state: {
                             routes: [
-                              { name: 'List', params: { list: currentUser.getList(listId), fromNotification: true, initialItemId: itemId } },
+                              { name: 'List', params: { list: currentUser.getListObject(listId), fromNotification: true, initialItemId: itemId } },
                               { name: 'Item', params: { item: { id: itemId }, canEdit: false } }
                             ],
                             index: 1

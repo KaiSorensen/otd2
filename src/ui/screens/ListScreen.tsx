@@ -212,13 +212,21 @@ const AddToLibraryModal: React.FC<AddToLibraryModalProps> = ({
 
 // Helper function to sort items
 function sortItems(items: Item[], sortOrder: SortOrderType): Item[] {
+  const getDate = (item: Item) => {
+    if (!item.createdAt) return new Date(0); // fallback to epoch if missing
+    if (item.createdAt instanceof Date) return item.createdAt;
+    // Try to parse if it's a string
+    const parsed = new Date(item.createdAt as any);
+    return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+  };
+
   switch (sortOrder) {
     case 'alphabetical':
       return [...items].sort((a, b) => (a.content || '').localeCompare(b.content || ''));
     case 'date-first':
-      return [...items].sort((a, b) => (b.createdAt.getTime() - a.createdAt.getTime()));
+      return [...items].sort((a, b) => getDate(b).getTime() - getDate(a).getTime());
     case 'date-last':
-      return [...items].sort((a, b) => (a.createdAt.getTime() - b.createdAt.getTime()));
+      return [...items].sort((a, b) => getDate(a).getTime() - getDate(b).getTime());
     case 'manual':
     default:
       return [...items].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
@@ -766,6 +774,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
           returnKeyType="search"
           autoCapitalize="none"
           autoCorrect={false}
+          blurOnSubmit={false}
+          onSubmitEditing={() => {}}
         />
         {searchTerm.length > 0 && (
           <TouchableOpacity onPress={() => setSearchTerm('')} style={styles.clearButton}>
@@ -832,6 +842,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               data={items}
               keyExtractor={item => item.id}
               onDragEnd={({ data }) => handleManualReorder(data)}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
               activationDistance={10}
               scrollEnabled={true}
               autoscrollThreshold={60}
@@ -892,6 +904,8 @@ const ListScreen: React.FC<ListScreenProps> = ({ list: initialList, onBack, init
               keyExtractor={item => item.id}
               scrollEnabled={true}
               onDragEnd={() => {}}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
               activationDistance={10}
               containerStyle={styles.itemsContainer}
               renderItem={({ item }: RenderItemParams<Item>) => (

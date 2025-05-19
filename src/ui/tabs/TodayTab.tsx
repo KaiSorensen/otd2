@@ -302,7 +302,7 @@ const TodayScreen = () => {
           </View>
           <View style={styles.itemContainer}>
             {displayedItem ? (
-              <ItemScreen item={displayedItem} canEdit={false} />
+              <ItemScreen list={todayInfo.todayLists[selectedListIndex]} item={displayedItem} canEdit={false} />
             ) : (
               <View style={styles.emptyState}>
                 <Text style={[styles.emptyTitle, { color: colors.textTertiary }]}>No Item Selected</Text>
